@@ -161,3 +161,4 @@ Die App verwendet:
 2. `GET ${PAPERLESS_BASE_URL}/api/documents/?tags__id=<pool_tag_id>&page_size=<SYNC_PAGE_SIZE>&ordering=-created&truncate_content=false` (paginierend)
 
 Wenn der Tag nicht gefunden wird, bricht der Sync mit einer klaren Fehlermeldung ab (`Tag '<name>' nicht gefunden`).
+Wichtig: Der Tag muss in Paperless exakt existieren (Groß-/Kleinschreibung relevant) und die gewünschten Dokumente müssen diesen Tag tragen.

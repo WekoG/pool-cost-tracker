@@ -26,20 +26,36 @@ def api_get(path: str, params: dict | None = None):
 
 def api_post(path: str, payload=None):
     resp = requests.post(f'{API_BASE_URL}{path}', json=payload, timeout=120)
-    resp.raise_for_status()
+    _raise_with_detail(resp)
     return resp.json() if resp.content else None
 
 
 def api_put(path: str, payload: dict):
     resp = requests.put(f'{API_BASE_URL}{path}', json=payload, timeout=30)
-    resp.raise_for_status()
+    _raise_with_detail(resp)
     return resp.json()
 
 
 def api_delete(path: str):
     resp = requests.delete(f'{API_BASE_URL}{path}', timeout=30)
-    resp.raise_for_status()
+    _raise_with_detail(resp)
     return resp.json()
+
+
+def _raise_with_detail(resp: requests.Response) -> None:
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        detail = None
+        try:
+            payload = resp.json()
+            if isinstance(payload, dict):
+                detail = payload.get('detail')
+        except Exception:
+            detail = None
+        if detail:
+            raise requests.HTTPError(f'{resp.status_code} {detail}', response=resp, request=resp.request) from exc
+        raise
 
 
 def clear_cache():
@@ -127,12 +143,15 @@ def dashboard_page():
     col_sync, col_info = st.columns([1, 2])
     with col_sync:
         if st.button('Sync jetzt', use_container_width=True, type='primary'):
-            with st.spinner('Synchronisierung läuft...'):
-                result = api_post('/sync')
-            clear_cache()
-            st.success(f"{result['synced']} Dokumente synchronisiert ({result['inserted']} neu, {result['updated']} aktualisiert)")
-            summary = api_get('/summary')
-            cfg = api_get('/config')
+            try:
+                with st.spinner('Synchronisierung läuft...'):
+                    result = api_post('/sync')
+                clear_cache()
+                st.success(f"{result['synced']} Dokumente synchronisiert ({result['inserted']} neu, {result['updated']} aktualisiert)")
+                summary = api_get('/summary')
+                cfg = api_get('/config')
+            except requests.HTTPError as exc:
+                st.error(f'Sync fehlgeschlagen: {exc}')
     with col_info:
         st.markdown(
             f"<div class='card'><div><b>Scheduler</b>: {'aktiv' if cfg['scheduler_enabled'] else 'inaktiv'}</div>"

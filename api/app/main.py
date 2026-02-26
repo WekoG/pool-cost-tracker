@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import date
 from decimal import Decimal
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
@@ -111,8 +112,31 @@ def get_config():
 
 @app.post('/sync')
 async def run_sync(db: Session = Depends(get_db)):
+    settings = get_settings()
+    if not (settings.PAPERLESS_BASE_URL or '').strip():
+        raise HTTPException(status_code=422, detail='PAPERLESS_BASE_URL fehlt. Bitte in .env setzen.')
+    if not (settings.PAPERLESS_TOKEN or '').strip():
+        raise HTTPException(status_code=422, detail='PAPERLESS_TOKEN fehlt. Bitte in .env setzen.')
+
     try:
-        return await sync_invoices(db, get_settings())
+        return await sync_invoices(db, settings)
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status in (401, 403):
+            raise HTTPException(status_code=502, detail='Paperless Auth failed (401/403). Token prüfen.') from exc
+        raise HTTPException(status_code=502, detail=f'Paperless API Fehler ({status}). Base URL/Tag/Token prüfen.') from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f'Paperless nicht erreichbar. PAPERLESS_BASE_URL prüfen ({settings.PAPERLESS_BASE_URL}).') from exc
+    except RuntimeError as exc:
+        message = str(exc)
+        if message.startswith("Tag '") and 'nicht gefunden' in message:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{message} (POOL_TAG_NAME={settings.POOL_TAG_NAME})",
+            ) from exc
+        raise HTTPException(status_code=422, detail=message) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
