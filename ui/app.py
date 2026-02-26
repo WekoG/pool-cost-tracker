@@ -71,11 +71,11 @@ def inject_theme():
           content: "";
           position: fixed;
           inset: 0;
-          background-image: linear-gradient(rgba(255,255,255,.86), rgba(255,255,255,.86)), url("data:image/jpeg;base64,{encoded}");
+          background-image: linear-gradient(rgba(10,10,12,0.55), rgba(10,10,12,0.55)), url("data:image/jpeg;base64,{encoded}");
           background-size: cover;
           background-position: center;
           background-attachment: fixed;
-          filter: saturate(0.95);
+          filter: saturate(0.85) blur(1px);
           z-index: -2;
         }}
         '''
@@ -84,38 +84,108 @@ def inject_theme():
         f"""
         <style>
           :root {{
-            --bg: #f6f7f9;
-            --card: rgba(255,255,255,0.82);
-            --text: #111827;
-            --muted: #6b7280;
-            --border: rgba(17,24,39,0.08);
+            --bg: #f5f5f7;
+            --card: #ffffff;
+            --text: #101214;
+            --muted: #61666d;
+            --border: rgba(17, 24, 39, 0.08);
+            --border-strong: rgba(17, 24, 39, 0.14);
             --accent: #0a84ff;
-            --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-            --radius: 18px;
+            --accent-hover: #0077ed;
+            --sidebar-bg: #1c1c1e;
+            --sidebar-text: #f5f5f7;
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+            --shadow-soft: 0 2px 10px rgba(15, 23, 42, 0.04);
+            --radius: 16px;
           }}
           html, body, [class*="css"], .stApp {{
             font-family: {FONT_STACK};
             color: var(--text);
           }}
-          .stApp {{ background: var(--bg); }}
+          .stApp {{
+            background: var(--bg);
+            background-image: radial-gradient(circle at top left, rgba(255,255,255,0.65), rgba(245,245,247,1) 60%);
+          }}
           {bg_css}
           .block-container {{ padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1280px; }}
+          section[data-testid="stSidebar"] {{
+            background: linear-gradient(180deg, #1c1c1e 0%, #232326 100%);
+            border-right: 1px solid rgba(255,255,255,0.06);
+          }}
+          section[data-testid="stSidebar"] * {{
+            color: var(--sidebar-text) !important;
+          }}
+          section[data-testid="stSidebar"] .stRadio label,
+          section[data-testid="stSidebar"] .stCaption {{
+            opacity: 0.92;
+          }}
           .card {{
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             padding: 14px 16px;
-            backdrop-filter: blur(8px);
           }}
           .kpi-grid {{ display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:12px; margin: 8px 0 14px; }}
-          .kpi-item {{ background: var(--card); border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow); padding: 14px; }}
+          .kpi-item {{ background: var(--card); border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow-soft); padding: 14px; }}
           .kpi-label {{ color: var(--muted); font-size: 0.82rem; }}
           .kpi-value {{ font-weight: 650; font-size: 1.4rem; letter-spacing: -0.02em; }}
           .muted {{ color: var(--muted); }}
-          div[data-testid="stMetric"] {{ background: var(--card); border:1px solid var(--border); border-radius:16px; padding:8px 10px; box-shadow: var(--shadow); }}
-          div[data-testid="stDataFrame"] {{ border-radius: 16px; overflow: hidden; border: 1px solid var(--border); }}
-          .stButton button, .stDownloadButton button {{ border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow); }}
+          div[data-testid="stMetric"] {{ background: var(--card); border:1px solid var(--border); border-radius:16px; padding:8px 10px; box-shadow: var(--shadow-soft); }}
+          div[data-testid="stDataFrame"] {{ border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: #fff; }}
+          .stTextInput > div > div, .stTextArea textarea, .stDateInput > div > div, .stNumberInput > div > div, .stSelectbox > div > div {{
+            border-radius: 12px !important;
+            border: 1px solid var(--border) !important;
+            background: #fff !important;
+          }}
+          .stTextInput input, .stTextArea textarea, .stNumberInput input {{
+            color: var(--text) !important;
+          }}
+          .stButton button, .stDownloadButton button {{
+            border-radius: 12px;
+            border: 1px solid var(--border-strong);
+            box-shadow: var(--shadow-soft);
+            background: #fff;
+            color: var(--text);
+            transition: all .14s ease;
+          }}
+          .stButton button:hover, .stDownloadButton button:hover {{
+            border-color: rgba(10,132,255,.35);
+            box-shadow: 0 4px 16px rgba(10,132,255,.08);
+          }}
+          .stButton button[kind="primary"] {{
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+            box-shadow: 0 6px 18px rgba(10,132,255,.20);
+          }}
+          .stButton button[kind="primary"]:hover {{
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+            box-shadow: 0 8px 22px rgba(10,132,255,.24);
+          }}
+          div[data-testid="stAlert"] {{
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-soft);
+            background: rgba(255,255,255,0.92);
+          }}
+          div[data-testid="stAlert"] > div {{
+            background: transparent !important;
+          }}
+          div[data-testid="stAlert"][kind="error"] {{
+            border-left: 4px solid rgba(200, 72, 72, 0.65);
+            border-color: rgba(200, 72, 72, 0.18);
+          }}
+          div[data-testid="stAlert"][kind="success"] {{
+            border-left: 4px solid rgba(90, 150, 110, 0.65);
+            border-color: rgba(90, 150, 110, 0.16);
+          }}
+          div[data-testid="stAlert"][kind="info"] {{
+            border-left: 4px solid rgba(10, 132, 255, 0.40);
+            border-color: rgba(10, 132, 255, 0.14);
+          }}
+          a {{ color: var(--accent); }}
           @media (max-width: 900px) {{ .kpi-grid {{ grid-template-columns: 1fr 1fr; }} }}
           @media (max-width: 560px) {{ .kpi-grid {{ grid-template-columns: 1fr; }} }}
         </style>
@@ -174,14 +244,14 @@ def dashboard_page():
 
     left, right = st.columns(2)
     with left:
-        section_card('Top 10 Vendors', 'Summierte Paperless-Kosten nach Lieferant')
+        section_card('Top 10 Unternehmen', 'Summierte Paperless-Kosten nach Unternehmen')
         top_df = pd.DataFrame(summary.get('top_vendors', []))
         if top_df.empty:
             st.info('Noch keine Rechnungen vorhanden.')
         else:
-            top_df = top_df.rename(columns={'name': 'Vendor', 'amount': 'Betrag'})
+            top_df = top_df.rename(columns={'name': 'Unternehmen', 'amount': 'Betrag'})
             st.dataframe(top_df, use_container_width=True, hide_index=True)
-            st.bar_chart(top_df.set_index('Vendor')['Betrag'])
+            st.bar_chart(top_df.set_index('Unternehmen')['Betrag'])
     with right:
         section_card('Kosten nach Kategorie', 'Nur manuelle Kostenpositionen')
         cat_df = pd.DataFrame(summary.get('costs_by_category', []))
@@ -199,7 +269,7 @@ def invoices_page():
     with f1:
         needs_review_filter = st.selectbox('Needs Review', ['Alle', 'Ja', 'Nein'])
     with f2:
-        search = st.text_input('Vendor/Titel suchen', placeholder='z. B. Poolbau')
+        search = st.text_input('Unternehmen/Titel suchen', placeholder='z. B. Poolbau')
     with f3:
         sort = st.selectbox('Sortierung', ['date_desc', 'amount_desc', 'vendor_asc'])
 
@@ -235,7 +305,7 @@ def invoices_page():
             pass
 
     with st.form('invoice_edit_form'):
-        vendor = st.text_input('Vendor', value=selected.get('vendor') or '')
+        vendor = st.text_input('Unternehmen', value=selected.get('vendor') or '')
         amount = st.number_input('Betrag (EUR)', min_value=0.0, step=0.01, value=float(selected.get('amount') or 0.0))
         needs_review = st.checkbox('Needs Review', value=bool(selected.get('needs_review', True)))
         st.text_area('OCR Kontextsnippet', value=snippet, height=120, disabled=True)
@@ -253,7 +323,7 @@ def manual_costs_page():
         c1, c2 = st.columns(2)
         with c1:
             m_date = st.date_input('Datum')
-            vendor = st.text_input('Vendor')
+            vendor = st.text_input('Unternehmen')
             amount = st.number_input('Betrag (EUR)', min_value=0.01, step=0.01)
         with c2:
             category = st.text_input('Kategorie')
@@ -285,7 +355,7 @@ def manual_costs_page():
     selected = options[selected_label]
     with st.form('manual_edit'):
         e_date = st.date_input('Datum', value=pd.to_datetime(selected['date']).date())
-        e_vendor = st.text_input('Vendor', value=selected['vendor'])
+        e_vendor = st.text_input('Unternehmen', value=selected['vendor'])
         e_amount = st.number_input('Betrag (EUR)', min_value=0.01, step=0.01, value=float(selected['amount']))
         e_category = st.text_input('Kategorie', value=selected.get('category') or '')
         e_note = st.text_area('Notiz', value=selected.get('note') or '', height=100)
