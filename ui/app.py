@@ -50,12 +50,62 @@ def _raise_with_detail(resp: requests.Response) -> None:
         try:
             payload = resp.json()
             if isinstance(payload, dict):
-                detail = payload.get('detail')
+                detail = format_api_error(payload)
         except Exception:
             detail = None
         if detail:
-            raise requests.HTTPError(f'{resp.status_code} {detail}', response=resp, request=resp.request) from exc
+            raise requests.HTTPError(str(detail), response=resp, request=resp.request) from exc
         raise
+
+
+def format_api_error(resp_json) -> str:
+    field_map = {
+        'vendor': 'Unternehmen',
+        'amount': 'Betrag',
+        'date': 'Datum',
+        'category': 'Kategorie',
+        'note': 'Notiz',
+    }
+
+    if isinstance(resp_json, dict):
+        detail = resp_json.get('detail', resp_json)
+    else:
+        detail = resp_json
+
+    if isinstance(detail, str):
+        return detail
+
+    if isinstance(detail, list):
+        messages: list[str] = []
+        for item in detail:
+            if not isinstance(item, dict):
+                continue
+            loc = item.get('loc') or []
+            field = next((str(p) for p in reversed(loc) if isinstance(p, str) and p not in {'body', 'query', 'path'}), None)
+            field_label = field_map.get(field or '', field or 'Feld')
+            err_type = str(item.get('type') or '')
+
+            if field == 'vendor' and ('string_too_short' in err_type or 'missing' in err_type):
+                messages.append('Unternehmen ist Pflicht.')
+                continue
+            if field == 'amount' and ('missing' in err_type):
+                messages.append('Betrag ist Pflicht.')
+                continue
+            if field == 'amount' and ('greater_than' in err_type or 'greater_than_equal' in err_type):
+                messages.append('Betrag muss größer als 0 sein.')
+                continue
+
+            raw_msg = str(item.get('msg') or 'Ungültiger Wert')
+            messages.append(f'{field_label}: {raw_msg}')
+
+        if messages:
+            unique = list(dict.fromkeys(messages))
+            return 'Bitte prüfen: ' + ' '.join(unique)
+
+    if isinstance(detail, dict):
+        return str(detail.get('message') or detail)
+
+    return str(detail)
 
 
 def clear_cache():
@@ -88,8 +138,12 @@ def inject_theme():
             --card: #ffffff;
             --text: #101214;
             --muted: #61666d;
+            --label: #111111;
+            --placeholder: rgba(17,17,17,0.45);
             --border: rgba(17, 24, 39, 0.08);
             --border-strong: rgba(17, 24, 39, 0.14);
+            --input-border: rgba(17,17,17,0.18);
+            --input-bg: rgba(255,255,255,0.92);
             --accent: #0a84ff;
             --accent-hover: #0077ed;
             --sidebar-bg: #1c1c1e;
@@ -126,6 +180,18 @@ def inject_theme():
             box-shadow: var(--shadow);
             padding: 14px 16px;
           }}
+          div[data-testid="stForm"] {{
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow-soft);
+            padding: 0.75rem 0.75rem 0.25rem 0.75rem;
+          }}
+          .stTextInput label, .stNumberInput label, .stDateInput label, .stTextArea label, .stSelectbox label {{
+            color: var(--label) !important;
+            opacity: 1 !important;
+            font-weight: 600 !important;
+          }}
           .kpi-grid {{ display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:12px; margin: 8px 0 14px; }}
           .kpi-item {{ background: var(--card); border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow-soft); padding: 14px; }}
           .kpi-label {{ color: var(--muted); font-size: 0.82rem; }}
@@ -135,11 +201,32 @@ def inject_theme():
           div[data-testid="stDataFrame"] {{ border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: #fff; }}
           .stTextInput > div > div, .stTextArea textarea, .stDateInput > div > div, .stNumberInput > div > div, .stSelectbox > div > div {{
             border-radius: 12px !important;
-            border: 1px solid var(--border) !important;
-            background: #fff !important;
+            border: 1px solid var(--input-border) !important;
+            background: var(--input-bg) !important;
           }}
-          .stTextInput input, .stTextArea textarea, .stNumberInput input {{
+          .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input {{
             color: var(--text) !important;
+            background: var(--input-bg) !important;
+            border-radius: 12px !important;
+            border: 1px solid var(--input-border) !important;
+          }}
+          .stTextInput input::placeholder, .stTextArea textarea::placeholder, .stNumberInput input::placeholder, .stDateInput input::placeholder {{
+            color: var(--placeholder) !important;
+            opacity: 1 !important;
+          }}
+          .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus, .stDateInput input:focus {{
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(0,122,255,0.25) !important;
+            border-color: rgba(0,122,255,0.55) !important;
+          }}
+          .stNumberInput [data-baseweb="input"], .stDateInput [data-baseweb="input"] {{
+            border-radius: 12px !important;
+            border: 1px solid var(--input-border) !important;
+            background: var(--input-bg) !important;
+          }}
+          .stNumberInput [data-baseweb="input"]:focus-within, .stDateInput [data-baseweb="input"]:focus-within {{
+            box-shadow: 0 0 0 3px rgba(0,122,255,0.20) !important;
+            border-color: rgba(0,122,255,0.55) !important;
           }}
           .stButton button, .stDownloadButton button {{
             border-radius: 12px;
@@ -323,23 +410,31 @@ def manual_costs_page():
         c1, c2 = st.columns(2)
         with c1:
             m_date = st.date_input('Datum')
-            vendor = st.text_input('Unternehmen')
-            amount = st.number_input('Betrag (EUR)', min_value=0.01, step=0.01)
+            vendor = st.text_input('Unternehmen *', placeholder='z. B. Poolbau Müller GmbH')
+            amount = st.number_input('Betrag (EUR) *', min_value=0.0, step=0.01, help='z. B. 1299,00')
         with c2:
-            category = st.text_input('Kategorie')
-            note = st.text_area('Notiz', height=110)
+            category = st.text_input('Kategorie', placeholder='z. B. Material / Dienstleistung / Technik')
+            note = st.text_area('Notiz', height=110, placeholder='Optional…')
         submit = st.form_submit_button('Anlegen')
     if submit:
-        api_post('/manual-costs', {
-            'date': m_date.isoformat(),
-            'vendor': vendor,
-            'amount': float(amount),
-            'category': category or None,
-            'note': note or None,
-            'currency': 'EUR',
-        })
-        clear_cache()
-        st.success('Manuelle Kostenposition angelegt.')
+        if not vendor.strip():
+            st.error('Unternehmen ist ein Pflichtfeld.')
+        elif float(amount) <= 0:
+            st.error('Betrag muss größer als 0 sein.')
+        else:
+            try:
+                api_post('/manual-costs', {
+                    'date': m_date.isoformat(),
+                    'vendor': vendor.strip(),
+                    'amount': float(amount),
+                    'category': category or None,
+                    'note': note or None,
+                    'currency': 'EUR',
+                })
+                clear_cache()
+                st.success('Manuelle Kostenposition angelegt.')
+            except requests.HTTPError as exc:
+                st.error(f'Bitte prüfen: {exc}')
 
     rows = api_get('/manual-costs')
     if not rows:
@@ -363,20 +458,31 @@ def manual_costs_page():
         save = col_a.form_submit_button('Speichern')
         delete = col_b.form_submit_button('Löschen')
     if save:
-        api_put(f"/manual-costs/{selected['id']}", {
-            'date': e_date.isoformat(),
-            'vendor': e_vendor,
-            'amount': float(e_amount),
-            'category': e_category or None,
-            'note': e_note or None,
-            'currency': selected.get('currency', 'EUR'),
-        })
-        clear_cache()
-        st.success('Eintrag aktualisiert.')
+        if not e_vendor.strip():
+            st.error('Unternehmen ist ein Pflichtfeld.')
+        elif float(e_amount) <= 0:
+            st.error('Betrag muss größer als 0 sein.')
+        else:
+            try:
+                api_put(f"/manual-costs/{selected['id']}", {
+                    'date': e_date.isoformat(),
+                    'vendor': e_vendor.strip(),
+                    'amount': float(e_amount),
+                    'category': e_category or None,
+                    'note': e_note or None,
+                    'currency': selected.get('currency', 'EUR'),
+                })
+                clear_cache()
+                st.success('Eintrag aktualisiert.')
+            except requests.HTTPError as exc:
+                st.error(f'Bitte prüfen: {exc}')
     if delete:
-        api_delete(f"/manual-costs/{selected['id']}")
-        clear_cache()
-        st.success('Eintrag gelöscht.')
+        try:
+            api_delete(f"/manual-costs/{selected['id']}")
+            clear_cache()
+            st.success('Eintrag gelöscht.')
+        except requests.HTTPError as exc:
+            st.error(f'Aktion fehlgeschlagen: {exc}')
 
 
 def export_page():
