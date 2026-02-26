@@ -1,4 +1,6 @@
-from datetime import date, datetime
+from __future__ import annotations
+
+import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -8,15 +10,15 @@ class InvoiceOut(BaseModel):
     id: int
     source: str
     paperless_doc_id: int
-    paperless_created: datetime | None = None
+    paperless_created: datetime.datetime | None = None
     title: str | None = None
     vendor: str | None = None
     amount: float | None = None
     currency: str
     confidence: float
     needs_review: bool
-    extracted_at: datetime
-    updated_at: datetime
+    extracted_at: datetime.datetime
+    updated_at: datetime.datetime
     debug_json: str | None = None
     correspondent: str | None = None
     document_type: str | None = None
@@ -33,7 +35,7 @@ class InvoiceUpdate(BaseModel):
 
 
 class ManualCostCreate(BaseModel):
-    date: date | None = None
+    date: datetime.date | None = None
     vendor: str = Field(min_length=1)
     amount: float = Field(gt=0)
     currency: str = 'EUR'
@@ -42,7 +44,7 @@ class ManualCostCreate(BaseModel):
 
 
 class ManualCostUpdate(BaseModel):
-    date: date | None = None
+    date: datetime.date | None = None
     vendor: str | None = None
     amount: float | None = Field(default=None, gt=0)
     currency: str | None = None
@@ -53,14 +55,14 @@ class ManualCostUpdate(BaseModel):
 class ManualCostOut(BaseModel):
     id: int
     source: str
-    date: date
+    date: datetime.date
     vendor: str
     amount: float
     currency: str
     category: str | None = None
     note: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
     model_config = {'from_attributes': True}
 
