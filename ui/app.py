@@ -113,58 +113,49 @@ def clear_cache():
 
 
 def inject_theme():
-    bg_css = ''
-    if ASSET_BG.exists():
-        encoded = base64.b64encode(ASSET_BG.read_bytes()).decode('ascii')
-        bg_css = f'''
-        .stApp::before {{
-          content: "";
-          position: fixed;
-          inset: 0;
-          background-image: linear-gradient(rgba(10,10,12,0.55), rgba(10,10,12,0.55)), url("data:image/jpeg;base64,{encoded}");
-          background-size: cover;
-          background-position: center;
-          background-attachment: fixed;
-          filter: saturate(0.85) blur(1px);
-          z-index: -2;
-        }}
-        '''
+    bg_css = ''  # Background image intentionally disabled in dark mode for consistent contrast.
 
     st.markdown(
         f"""
         <style>
           :root {{
-            --bg: #f5f5f7;
-            --card: #ffffff;
-            --text: #101214;
-            --muted: #61666d;
-            --label: #111111;
-            --placeholder: rgba(17,17,17,0.45);
-            --border: rgba(17, 24, 39, 0.08);
-            --border-strong: rgba(17, 24, 39, 0.14);
-            --input-border: rgba(17,17,17,0.18);
-            --input-bg: rgba(255,255,255,0.92);
-            --accent: #0a84ff;
-            --accent-hover: #0077ed;
-            --sidebar-bg: #1c1c1e;
-            --sidebar-text: #f5f5f7;
-            --shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
-            --shadow-soft: 0 2px 10px rgba(15, 23, 42, 0.04);
+            --bg: #0F1115;
+            --card: #171A21;
+            --surface: #11141A;
+            --surface-2: #141821;
+            --text: rgba(255,255,255,0.92);
+            --muted: rgba(255,255,255,0.6);
+            --label: rgba(255,255,255,0.92);
+            --placeholder: rgba(255,255,255,0.4);
+            --border: rgba(255,255,255,0.06);
+            --border-strong: rgba(255,255,255,0.15);
+            --input-border: rgba(255,255,255,0.15);
+            --input-bg: #11141A;
+            --accent: #2F81F7;
+            --accent-hover: #2A76E0;
+            --sidebar-bg: #11141A;
+            --sidebar-text: rgba(255,255,255,0.9);
+            --shadow: 0 8px 24px rgba(0,0,0,0.28);
+            --shadow-soft: 0 2px 10px rgba(0,0,0,0.22);
             --radius: 16px;
           }}
           html, body, [class*="css"], .stApp {{
             font-family: {FONT_STACK};
-            color: var(--text);
+            color: var(--text) !important;
+            background: var(--bg) !important;
           }}
           .stApp {{
-            background: var(--bg);
-            background-image: radial-gradient(circle at top left, rgba(255,255,255,0.65), rgba(245,245,247,1) 60%);
+            background: #0F1115 !important;
+            color: rgba(255,255,255,0.92) !important;
           }}
           {bg_css}
           .block-container {{ padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1280px; }}
+          .block-container > div {{
+            background: transparent !important;
+          }}
           section[data-testid="stSidebar"] {{
-            background: linear-gradient(180deg, #1c1c1e 0%, #232326 100%);
-            border-right: 1px solid rgba(255,255,255,0.06);
+            background: #11141A !important;
+            border-right: 1px solid rgba(255,255,255,0.06) !important;
           }}
           section[data-testid="stSidebar"] * {{
             color: var(--sidebar-text) !important;
@@ -198,7 +189,12 @@ def inject_theme():
           .kpi-value {{ font-weight: 650; font-size: 1.4rem; letter-spacing: -0.02em; }}
           .muted {{ color: var(--muted); }}
           div[data-testid="stMetric"] {{ background: var(--card); border:1px solid var(--border); border-radius:16px; padding:8px 10px; box-shadow: var(--shadow-soft); }}
-          div[data-testid="stDataFrame"] {{ border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: #fff; }}
+          div[data-testid="stDataFrame"] {{ border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: var(--card) !important; }}
+          [data-testid="stTable"], [data-testid="stDataFrameResizable"] {{
+            background: var(--card) !important;
+          }}
+          h1, h2, h3 {{ color: rgba(255,255,255,0.95) !important; }}
+          p, li, span, label, div {{ color: inherit; }}
           .stTextInput > div > div, .stTextArea textarea, .stDateInput > div > div, .stNumberInput > div > div, .stSelectbox > div > div {{
             border-radius: 12px !important;
             border: 1px solid var(--input-border) !important;
@@ -216,8 +212,8 @@ def inject_theme():
           }}
           .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus, .stDateInput input:focus {{
             outline: none !important;
-            box-shadow: 0 0 0 3px rgba(0,122,255,0.25) !important;
-            border-color: rgba(0,122,255,0.55) !important;
+            box-shadow: 0 0 0 2px rgba(47,129,247,0.25) !important;
+            border-color: #2F81F7 !important;
           }}
           .stNumberInput [data-baseweb="input"], .stDateInput [data-baseweb="input"] {{
             border-radius: 12px !important;
@@ -225,54 +221,63 @@ def inject_theme():
             background: var(--input-bg) !important;
           }}
           .stNumberInput [data-baseweb="input"]:focus-within, .stDateInput [data-baseweb="input"]:focus-within {{
-            box-shadow: 0 0 0 3px rgba(0,122,255,0.20) !important;
-            border-color: rgba(0,122,255,0.55) !important;
+            box-shadow: 0 0 0 2px rgba(47,129,247,0.25) !important;
+            border-color: #2F81F7 !important;
+          }}
+          .stSelectbox [data-baseweb="select"] {{
+            background: var(--input-bg) !important;
+            border: 1px solid var(--input-border) !important;
+            border-radius: 12px !important;
+          }}
+          .stSelectbox [data-baseweb="select"] * {{
+            color: rgba(255,255,255,0.9) !important;
           }}
           .stButton button, .stDownloadButton button {{
             border-radius: 12px;
-            border: 1px solid var(--border-strong);
+            border: none !important;
             box-shadow: var(--shadow-soft);
-            background: #fff;
-            color: var(--text);
+            background: #2F81F7 !important;
+            color: white !important;
             transition: all .14s ease;
           }}
           .stButton button:hover, .stDownloadButton button:hover {{
-            border-color: rgba(10,132,255,.35);
-            box-shadow: 0 4px 16px rgba(10,132,255,.08);
-          }}
-          .stButton button[kind="primary"] {{
-            background: var(--accent);
-            border-color: var(--accent);
-            color: white;
-            box-shadow: 0 6px 18px rgba(10,132,255,.20);
-          }}
-          .stButton button[kind="primary"]:hover {{
-            background: var(--accent-hover);
-            border-color: var(--accent-hover);
-            box-shadow: 0 8px 22px rgba(10,132,255,.24);
+            opacity: 0.9;
+            box-shadow: 0 8px 22px rgba(47,129,247,.18);
           }}
           div[data-testid="stAlert"] {{
             border-radius: 12px;
             border: 1px solid var(--border);
             box-shadow: var(--shadow-soft);
-            background: rgba(255,255,255,0.92);
+            background: rgba(23,26,33,0.95);
           }}
           div[data-testid="stAlert"] > div {{
             background: transparent !important;
           }}
           div[data-testid="stAlert"][kind="error"] {{
-            border-left: 4px solid rgba(200, 72, 72, 0.65);
-            border-color: rgba(200, 72, 72, 0.18);
+            border-left: 4px solid rgba(255,80,80,0.9);
+            border-color: rgba(255,80,80,0.18);
           }}
           div[data-testid="stAlert"][kind="success"] {{
-            border-left: 4px solid rgba(90, 150, 110, 0.65);
-            border-color: rgba(90, 150, 110, 0.16);
+            border-left: 4px solid rgba(47,129,247,0.65);
+            border-color: rgba(47,129,247,0.16);
           }}
           div[data-testid="stAlert"][kind="info"] {{
-            border-left: 4px solid rgba(10, 132, 255, 0.40);
-            border-color: rgba(10, 132, 255, 0.14);
+            border-left: 4px solid rgba(47,129,247,0.55);
+            border-color: rgba(47,129,247,0.14);
           }}
-          a {{ color: var(--accent); }}
+          div[data-testid="stAlert"] * {{ color: rgba(255,255,255,0.92) !important; }}
+          a {{ color: #2F81F7; }}
+          thead tr {{ background: #11141A !important; }}
+          tbody tr {{ background: #171A21 !important; }}
+          tbody tr:nth-child(even) {{ background: #141821 !important; }}
+          [data-testid="stDataFrame"] table, [data-testid="stDataFrame"] th, [data-testid="stDataFrame"] td {{
+            color: rgba(255,255,255,0.9) !important;
+          }}
+          [data-testid="stToolbar"] {{ background: transparent !important; }}
+          [data-testid="stChart"] > div, .vega-embed, .vega-embed > details {{
+            background: var(--card) !important;
+            border-radius: 14px;
+          }}
           @media (max-width: 900px) {{ .kpi-grid {{ grid-template-columns: 1fr 1fr; }} }}
           @media (max-width: 560px) {{ .kpi-grid {{ grid-template-columns: 1fr; }} }}
         </style>
