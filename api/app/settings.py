@@ -1,12 +1,21 @@
 from functools import lru_cache
+import os
 
 from pydantic import Field
 try:
     from pydantic_settings import BaseSettings, SettingsConfigDict
 except ModuleNotFoundError:  # pragma: no cover - local test fallback
-    from pydantic import BaseSettings  # type: ignore
+    from pydantic import BaseModel  # type: ignore
 
     SettingsConfigDict = dict  # type: ignore
+
+    class BaseSettings(BaseModel):  # type: ignore
+        def __init__(self, **data):
+            annotations = getattr(self.__class__, '__annotations__', {})
+            for field_name in annotations:
+                if field_name not in data and field_name in os.environ:
+                    data[field_name] = os.environ[field_name]
+            super().__init__(**data)
 
 
 class Settings(BaseSettings):

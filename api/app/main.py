@@ -174,8 +174,13 @@ def update_invoice(invoice_id: int, payload: InvoiceUpdate, db: Session = Depend
 
     changes = payload.model_dump(exclude_unset=True)
     if 'amount' in changes and changes['amount'] is not None:
-        invoice.amount = Decimal(str(changes['amount']))
+        new_amount = Decimal(str(changes['amount']))
+        if invoice.amount != new_amount:
+            invoice.amount_source = 'manual'
+        invoice.amount = new_amount
     if 'vendor' in changes:
+        if changes['vendor'] is not None and invoice.vendor != changes['vendor']:
+            invoice.vendor_source = 'manual'
         invoice.vendor = changes['vendor']
     if 'needs_review' in changes:
         invoice.needs_review = bool(changes['needs_review'])

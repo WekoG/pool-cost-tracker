@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Optional
 
 from sqlalchemy import Boolean, Date, DateTime, Float, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -14,20 +17,22 @@ class Invoice(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source: Mapped[str] = mapped_column(String(32), default='paperless', nullable=False)
     paperless_doc_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    paperless_created: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    vendor: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    paperless_created: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    vendor: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    vendor_source: Mapped[str] = mapped_column(String(16), default='auto', nullable=False)
+    amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    amount_source: Mapped[str] = mapped_column(String(16), default='auto', nullable=False)
     currency: Mapped[str] = mapped_column(String(8), default='EUR', nullable=False)
     confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     needs_review: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     extracted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    debug_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    debug_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    correspondent: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    document_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    correspondent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    document_type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    ocr_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class ManualCost(Base):
@@ -39,7 +44,7 @@ class ManualCost(Base):
     vendor: Mapped[str] = mapped_column(String(255), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), default='EUR', nullable=False)
-    category: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

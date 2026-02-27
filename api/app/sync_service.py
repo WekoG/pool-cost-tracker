@@ -48,11 +48,8 @@ async def sync_invoices(db: Session, settings: Settings) -> SyncResponse:
             'paperless_doc_id': int(doc['id']),
             'paperless_created': paperless_created,
             'title': doc.get('title'),
-            'vendor': extracted.get('vendor'),
-            'amount': Decimal(str(extracted['amount'])) if extracted.get('amount') is not None else None,
             'currency': extracted.get('currency', 'EUR'),
             'confidence': float(extracted.get('confidence') or 0.0),
-            'needs_review': bool(extracted.get('needs_review', True)),
             'extracted_at': now,
             'debug_json': extracted.get('debug_json'),
             'correspondent': doc.get('correspondent'),
@@ -61,11 +58,30 @@ async def sync_invoices(db: Session, settings: Settings) -> SyncResponse:
         }
 
         if inv is None:
+            new_data['vendor'] = extracted.get('vendor')
+            new_data['amount'] = Decimal(str(extracted['amount'])) if extracted.get('amount') is not None else None
+            new_data['vendor_source'] = 'auto'
+            new_data['amount_source'] = 'auto'
+            new_data['needs_review'] = bool(extracted.get('needs_review', True))
             db.add(Invoice(**new_data))
             inserted += 1
             continue
 
         changed = False
+        extracted_vendor = extracted.get('vendor')
+        extracted_amount = Decimal(str(extracted['amount'])) if extracted.get('amount') is not None else None
+
+        if inv.vendor_source == 'auto':
+            new_data['vendor'] = extracted_vendor
+        if inv.amount_source == 'auto':
+            new_data['amount'] = extracted_amount
+
+        # Manual overrides should not be reverted to review-required by sync.
+        if inv.vendor_source == 'manual' or inv.amount_source == 'manual':
+            new_data['needs_review'] = False
+        else:
+            new_data['needs_review'] = bool(extracted.get('needs_review', True))
+
         for key, value in new_data.items():
             if getattr(inv, key) != value:
                 setattr(inv, key, value)

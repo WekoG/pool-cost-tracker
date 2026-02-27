@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import base64
 import json
 import os
 from io import StringIO
-from pathlib import Path
 
 import pandas as pd
 import requests
 import streamlit as st
 
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://api:8000').rstrip('/')
-ASSET_BG = Path(__file__).parent / 'assets' / 'pool_bg.jpg'
 FONT_STACK = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
 
 
@@ -121,27 +118,9 @@ def _date_input_de(label: str, value, key: str | None = None):
     return selected
 
 
-def apply_theme(theme: str):
-    is_dark = theme == 'Dark'
+def apply_theme():
     bg_css = ''
-    if (not is_dark) and ASSET_BG.exists():
-        encoded = base64.b64encode(ASSET_BG.read_bytes()).decode('ascii')
-        bg_css = f'''
-        .stApp::before {{
-          content: "";
-          position: fixed;
-          inset: 0;
-          background-image: linear-gradient(rgba(255,255,255,.74), rgba(255,255,255,.78)), url("data:image/jpeg;base64,{encoded}");
-          background-size: cover;
-          background-position: center;
-          background-attachment: fixed;
-          filter: saturate(0.82) blur(0.5px);
-          z-index: -2;
-        }}
-        '''
-
-    if is_dark:
-        theme_vars = """
+    theme_vars = """
           :root {
             --bg: #0F1115;
             --bg-grad-a: rgba(47,129,247,0.08);
@@ -170,38 +149,6 @@ def apply_theme(theme: str):
             --error-accent: rgba(255,80,80,0.9);
             --radius: 16px;
             --glass-blur: 18px;
-          }
-        """
-    else:
-        theme_vars = """
-          :root {
-            --bg: #F5F5F7;
-            --bg-grad-a: rgba(10,132,255,0.07);
-            --bg-grad-b: rgba(255,255,255,0.72);
-            --card: rgba(255,255,255,0.92);
-            --card-solid: rgba(255,255,255,0.96);
-            --surface: #FFFFFF;
-            --surface-2: #F1F3F7;
-            --text: #111111;
-            --muted: rgba(17,17,17,0.60);
-            --label: #111111;
-            --placeholder: rgba(0,0,0,0.45);
-            --border: rgba(0,0,0,0.08);
-            --border-soft: rgba(0,0,0,0.06);
-            --border-strong: rgba(0,0,0,0.16);
-            --input-border: rgba(0,0,0,0.18);
-            --input-bg: #FFFFFF;
-            --accent: #0A84FF;
-            --accent-hover: #0077ED;
-            --sidebar-bg: rgba(255,255,255,0.78);
-            --sidebar-text: rgba(17,17,17,0.92);
-            --shadow: 0 10px 26px rgba(15,23,42,0.08);
-            --shadow-soft: 0 4px 14px rgba(15,23,42,0.06);
-            --alert-bg: rgba(255,255,255,0.94);
-            --success-accent: rgba(10,132,255,0.55);
-            --error-accent: rgba(255,80,80,0.85);
-            --radius: 16px;
-            --glass-blur: 10px;
           }
         """
 
@@ -555,19 +502,9 @@ def export_page():
 
 def main():
     st.set_page_config(page_title='pool-cost-tracker', layout='wide')
-    if 'theme' not in st.session_state:
-        st.session_state['theme'] = 'Dark'
-
     st.sidebar.markdown('## Poolkosten')
     st.sidebar.caption('Kostenübersicht')
-    selected_theme = st.sidebar.radio(
-        'Design',
-        ['Dark', 'Light'],
-        index=0 if st.session_state['theme'] == 'Dark' else 1,
-        key='theme_selector',
-    )
-    st.session_state['theme'] = selected_theme
-    apply_theme(st.session_state['theme'])
+    apply_theme()
     st.sidebar.caption(f'API: {API_BASE_URL}')
     page = st.sidebar.radio('Seiten', ['Dashboard', 'Paperless-Rechnungen', 'Manuelle Kosten', 'Export'])
 
