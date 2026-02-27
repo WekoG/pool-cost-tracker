@@ -4,15 +4,38 @@ import json
 import re
 from dataclasses import dataclass
 
-AMOUNT_KEYWORDS = [
-    'rechnungsbetrag',
-    'gesamt',
-    'summe',
-    'total',
-    'brutto',
-    'endbetrag',
+POSITIVE_KEYWORDS = [
     'zahlbetrag',
     'zu zahlen',
+    'endbetrag',
+    'rechnungsbetrag',
+    'gesamtbetrag',
+    'bruttobetrag',
+    'brutto',
+    'total',
+    'gesamt',
+    'summe',
+]
+
+NEGATIVE_KEYWORDS = [
+    'rabatt',
+    'skonto',
+    'nachlass',
+    'gutschrift',
+    'ersparnis',
+    'bonus',
+    'preisvorteil',
+    'discount',
+]
+
+NEUTRAL_KEYWORDS = [
+    'netto',
+    'mwst',
+    'ust',
+    'steuer',
+    'mehrwertsteuer',
+    'zwischenbetrag',
+    'zwischensumme',
 ]
 
 LETTER_CLASS = 'A-Za-zÄÖÜäöüß'
@@ -31,16 +54,23 @@ class AmountCandidate:
     raw: str
     line_index: int
     line_text: str
-    score: float
-    keyword: str | None
-    proximity: int | None
+    start: int
+    end: int
+    context: str
+    currency_near: bool
+    negative_near: bool
+    pos_same_line: list[str]
+    pos_context: list[str]
+    neg_same_line: list[str]
+    neg_context: list[str]
+    neutral_same_line: list[str]
+    score: int
 
 
 @dataclass
 class VendorCandidate:
     value: str | None
     source: str
-
 
 
 def parse_eur_amount(raw: str) -> float | None:
@@ -73,53 +103,130 @@ def _normalize_lines(text: str) -> list[str]:
     return [re.sub(r'\s+', ' ', line).strip() for line in text.splitlines() if line.strip()]
 
 
-def _find_keyword_proximity(lines: list[str], line_idx: int, amount_pos: int) -> tuple[str | None, int | None]:
-    best_keyword = None
-    best_distance = None
-    for offset in (-1, 0, 1):
-        idx = line_idx + offset
-        if idx < 0 or idx >= len(lines):
-            continue
-        line_lower = lines[idx].lower()
-        for keyword in AMOUNT_KEYWORDS:
-            pattern = _keyword_pattern(keyword)
-            for match in pattern.finditer(line_lower):
-                if idx == line_idx:
-                    distance = abs(match.start() - amount_pos)
-                else:
-                    distance = 200 + abs(offset) * 25 + match.start()
-                if best_distance is None or distance < best_distance:
-                    best_distance = distance
-                    best_keyword = keyword
-    return best_keyword, best_distance
+def _find_keywords(text: str, keywords: list[str]) -> list[str]:
+    low = text.lower()
+    found: list[str] = []
+    for keyword in keywords:
+        if _keyword_pattern(keyword).search(low):
+            found.append(keyword)
+    return found
 
 
-def _score_amount(amount: float, keyword: str | None, proximity: int | None) -> float:
-    score = 0.0
-    if 1 <= amount <= 1_000_000:
-        score += 2.0
-    else:
-        score -= 5.0
-    if keyword:
-        score += 5.0
-        if proximity is not None:
-            score += max(0.0, 3.0 - min(proximity, 300) / 100.0)
+def _line_start_indices(lines: list[str], source_text: str) -> list[int]:
+    starts: list[int] = []
+    cursor = 0
+    for line in lines:
+        idx = source_text.find(line, cursor)
+        if idx == -1:
+            idx = cursor
+        starts.append(idx)
+        cursor = idx + len(line)
+    return starts
+
+
+def _currency_near(text: str, start: int, end: int) -> bool:
+    left = max(0, start - 10)
+    right = min(len(text), end + 10)
+    nearby = text[left:right]
+    return bool(re.search(r'(€|\bEUR\b)', nearby, flags=re.IGNORECASE))
+
+
+def _negative_near(text: str, start: int) -> bool:
+    left = max(0, start - 3)
+    near = text[left:start]
+    return '-' in near
+
+
+def _score_candidate(candidate: AmountCandidate) -> int:
+    score = 0
+    if candidate.pos_same_line:
+        score += 40
+    if candidate.pos_context:
+        score += 25
+    if candidate.neg_same_line:
+        score -= 60
+    if candidate.neg_context:
+        score -= 35
+    if candidate.neutral_same_line:
+        score -= 15
+    if candidate.currency_near:
+        score += 10
+    if candidate.negative_near:
+        score -= 50
     return score
 
 
 def _amount_candidates(text: str) -> list[AmountCandidate]:
     lines = _normalize_lines(text)
+    if not lines:
+        return []
+
+    starts = _line_start_indices(lines, text)
     candidates: list[AmountCandidate] = []
-    for idx, line in enumerate(lines):
+
+    for line_idx, line in enumerate(lines):
+        line_start = starts[line_idx]
+        line_end = line_start + len(line)
         for match in AMOUNT_PATTERN.finditer(line):
             raw = match.group('amount')
             amount = parse_eur_amount(raw)
             if amount is None:
                 continue
-            keyword, proximity = _find_keyword_proximity(lines, idx, match.start())
-            score = _score_amount(amount, keyword, proximity)
-            candidates.append(AmountCandidate(amount, raw, idx, line, score, keyword, proximity))
+
+            global_start = line_start + match.start('amount')
+            global_end = line_start + match.end('amount')
+            context_left = max(0, global_start - 60)
+            context_right = min(len(text), global_end + 60)
+            context = text[context_left:context_right]
+
+            pos_same = _find_keywords(line, POSITIVE_KEYWORDS)
+            pos_context = _find_keywords(context, POSITIVE_KEYWORDS)
+            neg_same = _find_keywords(line, NEGATIVE_KEYWORDS)
+            neg_context = _find_keywords(context, NEGATIVE_KEYWORDS)
+            neutral_same = _find_keywords(line, NEUTRAL_KEYWORDS)
+
+            candidate = AmountCandidate(
+                amount=amount,
+                raw=raw,
+                line_index=line_idx,
+                line_text=line,
+                start=global_start,
+                end=global_end,
+                context=context,
+                currency_near=_currency_near(text, global_start, global_end),
+                negative_near=_negative_near(text, global_start),
+                pos_same_line=pos_same,
+                pos_context=pos_context,
+                neg_same_line=neg_same,
+                neg_context=neg_context,
+                neutral_same_line=neutral_same,
+                score=0,
+            )
+            candidate.score = _score_candidate(candidate)
+
+            # Plausibility constraints
+            if candidate.amount <= 0 or candidate.amount > 1_000_000:
+                continue
+            if candidate.negative_near:
+                continue
+
+            candidates.append(candidate)
+
     return candidates
+
+
+def _choose_candidate(candidates: list[AmountCandidate]) -> AmountCandidate | None:
+    if not candidates:
+        return None
+
+    def tie_amount(c: AmountCandidate) -> float:
+        return c.amount if not c.neg_same_line else 0.0
+
+    return sorted(
+        candidates,
+        key=lambda c: (c.score, bool(c.pos_same_line), tie_amount(c)),
+        reverse=True,
+    )[0]
 
 
 def _pick_vendor(text: str, correspondent: str | None) -> VendorCandidate:
@@ -131,7 +238,7 @@ def _pick_vendor(text: str, correspondent: str | None) -> VendorCandidate:
         lower = line.lower()
         if len(line) < 3 or len(line) > 90:
             continue
-        if any(_keyword_pattern(keyword).search(lower) for keyword in AMOUNT_KEYWORDS):
+        if any(_keyword_pattern(keyword).search(lower) for keyword in POSITIVE_KEYWORDS):
             continue
         if AMOUNT_PATTERN.search(line):
             continue
@@ -146,53 +253,76 @@ def _pick_vendor(text: str, correspondent: str | None) -> VendorCandidate:
         if re.fullmatch(r'[\d\s+\-./]+', line):
             continue
         return VendorCandidate(line[:255], 'ocr_heuristic')
+
     return VendorCandidate(None, 'none')
+
+
+def _build_debug_top(candidates: list[AmountCandidate]) -> list[dict]:
+    ranked = sorted(candidates, key=lambda c: (c.score, bool(c.pos_same_line), c.amount), reverse=True)[:5]
+    top: list[dict] = []
+    for c in ranked:
+        triggered = {
+            'pos_same_line': c.pos_same_line,
+            'pos_context': c.pos_context,
+            'neg_same_line': c.neg_same_line,
+            'neg_context': c.neg_context,
+            'neutral_same_line': c.neutral_same_line,
+            'currency_near': c.currency_near,
+        }
+        top.append(
+            {
+                'value': c.amount,
+                'score': c.score,
+                'line_snippet': c.line_text[:160],
+                'triggered_keywords': triggered,
+            }
+        )
+    return top
 
 
 def extract_invoice_fields(text: str, correspondent: str | None) -> dict:
     text = text or ''
     vendor_candidate = _pick_vendor(text, correspondent)
     candidates = _amount_candidates(text)
-
-    chosen: AmountCandidate | None = None
-    if candidates:
-        chosen = sorted(candidates, key=lambda c: (c.score, c.amount), reverse=True)[0]
+    chosen = _choose_candidate(candidates)
 
     amount = chosen.amount if chosen else None
-    confidence = 0.1
+
+    low_signal = chosen is None or chosen.score < 25
+    only_neutral = bool(chosen and not chosen.pos_same_line and not chosen.pos_context and chosen.neutral_same_line)
+    needs_review_amount = low_signal or only_neutral
+    needs_review = needs_review_amount or not vendor_candidate.value
+
+    confidence = 0.15
     if vendor_candidate.value:
-        confidence += 0.35 if vendor_candidate.source == 'correspondent' else 0.2
+        confidence += 0.3 if vendor_candidate.source == 'correspondent' else 0.2
     if chosen:
-        confidence += 0.25
-        if chosen.keyword:
-            confidence += 0.2
-        if 1 <= chosen.amount <= 1_000_000:
+        confidence += min(max(chosen.score, 0), 80) / 180.0
+        if chosen.pos_same_line:
             confidence += 0.1
-        if chosen.proximity is not None and chosen.proximity <= 30:
-            confidence += 0.1
-        if not (1 <= chosen.amount <= 1_000_000):
-            confidence = min(confidence, 0.6)
+        elif chosen.pos_context:
+            confidence += 0.05
+    if needs_review:
+        confidence = min(confidence, 0.64)
     confidence = round(min(confidence, 0.99), 2)
 
-    needs_review = not (vendor_candidate.value and amount is not None and confidence >= 0.65)
-
-    context_snippet = None
-    if chosen:
-        all_lines = _normalize_lines(text)
-        start = max(0, chosen.line_index - 1)
-        end = min(len(all_lines), chosen.line_index + 2)
-        context_snippet = ' | '.join(all_lines[start:end])[:500]
+    context_snippet = chosen.context[:500] if chosen else None
 
     debug = {
-        'keyword': chosen.keyword if chosen else None,
+        'keyword': chosen.pos_same_line[0] if chosen and chosen.pos_same_line else (chosen.pos_context[0] if chosen and chosen.pos_context else None),
         'regex': AMOUNT_REGEX,
         'context_snippet': context_snippet,
         'vendor_source': vendor_candidate.source,
         'candidates_checked': len(candidates),
+        'top_candidates': _build_debug_top(candidates),
         'extra': {
             'chosen_raw': chosen.raw if chosen else None,
             'chosen_score': chosen.score if chosen else None,
-            'chosen_proximity': chosen.proximity if chosen else None,
+            'chosen_line': chosen.line_text[:200] if chosen else None,
+            'needs_review_amount_reason': {
+                'low_signal': low_signal,
+                'only_neutral': only_neutral,
+            },
         },
     }
 

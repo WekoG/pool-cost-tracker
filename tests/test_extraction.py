@@ -38,6 +38,7 @@ def test_extract_zu_zahlen_beats_netto():
     ])
     result = extract_invoice_fields(text, None)
     assert result['amount'] == 1190.00
+    assert result['needs_review'] is True  # vendor missing
 
 
 def test_extract_brutto_beats_noise_summe_in_zwischensumme():
@@ -51,7 +52,7 @@ def test_extract_brutto_beats_noise_summe_in_zwischensumme():
 
 def test_extract_fallback_uses_highest_plausible_amount():
     text = 'Position A 25,00\nPosition B 99,00\nPosition C 49,00'
-    result = extract_invoice_fields(text, None)
+    result = extract_invoice_fields(text, 'Fallback GmbH')
     assert result['amount'] == 99.0
 
 
@@ -68,17 +69,16 @@ def test_vendor_heuristic_ignores_email_and_iban_lines():
 
 
 def test_ocr_noise_still_extracts_amount():
-    text = '8rutto 1.2?4,56\nZu zahlen 124,56 EUR\nSeite 1'
+    text = '8rutto 1.2?4,56\nZu zahlen 124,56\nSeite 1'
     result = extract_invoice_fields(text, None)
     assert result['amount'] == 124.56
 
 
-def test_out_of_range_amount_lowers_confidence_and_needs_review():
+def test_out_of_range_amount_is_ignored_and_needs_review():
     text = 'Zu zahlen 12345678,99 EUR'
     result = extract_invoice_fields(text, None)
-    assert result['amount'] == 12345678.99
+    assert result['amount'] is None
     assert result['needs_review'] is True
-    assert result['confidence'] < 0.65
 
 
 def test_missing_amount_sets_needs_review():
@@ -88,13 +88,14 @@ def test_missing_amount_sets_needs_review():
     assert result['needs_review'] is True
 
 
-def test_debug_json_contains_expected_fields():
-    result = extract_invoice_fields('Gesamt 500,00 EUR', 'X GmbH')
+def test_debug_json_contains_expected_fields_and_top_candidates():
+    result = extract_invoice_fields('Gesamt 500,00 EUR\nRabatt 20,00 EUR', 'X GmbH')
     debug = json.loads(result['debug_json'])
     assert 'regex' in debug
     assert 'context_snippet' in debug
     assert 'vendor_source' in debug
     assert 'candidates_checked' in debug
+    assert 'top_candidates' in debug
 
 
 def test_confidence_higher_with_correspondent_than_without():
@@ -126,3 +127,83 @@ def test_vendor_none_when_only_artifacts_present():
     result = extract_invoice_fields(text, None)
     assert result['vendor'] is None
     assert result['needs_review'] is True
+
+
+# New extraction-specific scoring tests
+
+def test_prefers_payable_total_over_net_and_tax():
+    text = '\n'.join([
+        'Netto 1.000,00 EUR',
+        'MwSt 190,00 EUR',
+        'Brutto 1.190,00 EUR',
+        'Zahlbetrag 1.190,00 EUR',
+    ])
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] == 1190.00
+    assert result['needs_review'] is False
+
+
+def test_ignores_discount_line_and_selects_total():
+    text = '\n'.join([
+        'Rabatt 50,00 EUR',
+        'Summe 450,00 EUR',
+        'Zu zahlen 450,00 EUR',
+    ])
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] == 450.00
+
+
+def test_ignores_skonto_amount():
+    text = '\n'.join([
+        'Gesamtbetrag 1.000,00 EUR',
+        'Skonto bei Zahlung bis 10.01: 20,00 EUR',
+        'Zu zahlen 1.000,00 EUR',
+    ])
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] == 1000.00
+
+
+def test_multiple_sum_lines_prefers_endbetrag():
+    text = '\n'.join([
+        'Zwischensumme 780,00 EUR',
+        'Summe 900,00 EUR',
+        'Endbetrag 900,00 EUR',
+    ])
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] == 900.00
+
+
+def test_ocr_without_currency_symbol_still_picks_payable():
+    text = '\n'.join([
+        'Nettobetrag 1200,00',
+        'Zu zahlen 1234,56',
+    ])
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] == 1234.56
+
+
+def test_only_net_found_sets_needs_review_true():
+    text = '\n'.join([
+        'Nettobetrag 890,00 EUR',
+        'Mehrwertsteuer 19%',
+    ])
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] == 890.00
+    assert result['needs_review'] is True
+
+
+def test_credit_note_negative_amount_is_not_used():
+    text = '\n'.join([
+        'Gutschrift',
+        'Zu zahlen -120,00 EUR',
+        'Rabatt -20,00 EUR',
+    ])
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] is None
+    assert result['needs_review'] is True
+
+
+def test_thousands_separator_with_comma_is_supported():
+    text = 'Rechnungsbetrag 12.345,67 EUR'
+    result = extract_invoice_fields(text, 'ACME GmbH')
+    assert result['amount'] == 12345.67
