@@ -16,6 +16,17 @@ CONNECT_TIMEOUT = 1.5
 READ_TIMEOUT = 4.0
 
 
+def inject_no_cache_meta() -> None:
+    st.markdown(
+        """
+        <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _perf_enabled() -> bool:
     return bool(st.session_state.get('perf_debug', False))
 
@@ -595,6 +606,7 @@ def _render_perf_debug():
 
 def main():
     st.set_page_config(page_title='pool-cost-tracker', layout='wide')
+    inject_no_cache_meta()
     _perf_reset()
 
     st.sidebar.markdown('## Poolkosten')
