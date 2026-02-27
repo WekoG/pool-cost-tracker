@@ -8,84 +8,12 @@ from time import perf_counter
 import pandas as pd
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 
 os.environ.setdefault('STREAMLIT_BROWSER_GATHER_USAGE_STATS', 'false')
 
 API_BASE_URL = os.getenv('API_BASE_URL', 'http://api:8000').rstrip('/')
-FONT_STACK = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
 CONNECT_TIMEOUT = 1.5
 READ_TIMEOUT = 4.0
-
-
-def _is_safari_user_agent(user_agent: str) -> bool:
-    ua = (user_agent or '').lower()
-    if not ua:
-        return False
-    if 'safari' not in ua:
-        return False
-    blocked_tokens = ('chrome', 'chromium', 'crios', 'fxios', 'edg')
-    return not any(token in ua for token in blocked_tokens)
-
-
-def _extract_user_agent_from_headers() -> str:
-    try:
-        headers = getattr(st.context, 'headers', None)
-    except Exception:
-        headers = None
-    if not headers:
-        return ''
-    for key in ('user-agent', 'User-Agent'):
-        if key in headers and headers[key]:
-            return str(headers[key])
-    return ''
-
-
-def _capture_user_agent_with_js() -> None:
-    if st.session_state.get('_ua_capture_injected'):
-        return
-    st.session_state['_ua_capture_injected'] = True
-    components.html(
-        """
-        <script>
-          (function () {
-            try {
-              const ua = navigator.userAgent || '';
-              const parentWindow = window.parent;
-              const url = new URL(parentWindow.location.href);
-              if (!url.searchParams.get('ua')) {
-                url.searchParams.set('ua', ua);
-                parentWindow.location.replace(url.toString());
-              }
-            } catch (e) {}
-          })();
-        </script>
-        """,
-        height=0,
-        width=0,
-    )
-
-
-def detect_browser_flags() -> tuple[bool, str]:
-    if st.session_state.get('browser_ua'):
-        ua = str(st.session_state['browser_ua'])
-        return _is_safari_user_agent(ua), ua
-
-    ua_from_headers = _extract_user_agent_from_headers()
-    if ua_from_headers:
-        st.session_state['browser_ua'] = ua_from_headers
-        st.session_state['browser_ua_source'] = 'headers'
-        return _is_safari_user_agent(ua_from_headers), ua_from_headers
-
-    ua_from_query = str(st.query_params.get('ua', ''))
-    if ua_from_query:
-        st.session_state['browser_ua'] = ua_from_query
-        st.session_state['browser_ua_source'] = 'query-param'
-        return _is_safari_user_agent(ua_from_query), ua_from_query
-
-    _capture_user_agent_with_js()
-    st.session_state['browser_ua_source'] = 'unknown'
-    return False, ''
 
 
 def _perf_enabled() -> bool:
@@ -256,177 +184,147 @@ def _date_input_de(label: str, value, key: str | None = None):
     return selected
 
 
-def apply_theme(enable_blur: bool):
-    bg_css = ''
-    card_bg = 'rgba(255,255,255,0.06)' if enable_blur else 'rgba(18,18,22,0.72)'
-    sidebar_bg = 'rgba(17,20,26,0.72)' if enable_blur else 'rgba(17,20,26,0.88)'
-    blur_px = '18px' if enable_blur else '0px'
-    alert_bg = 'rgba(23,26,33,0.84)' if enable_blur else 'rgba(20,22,28,0.92)'
-    shadow_main = '0 10px 30px rgba(0,0,0,0.35)' if enable_blur else '0 8px 18px rgba(0,0,0,0.25)'
-    shadow_soft = '0 6px 18px rgba(0,0,0,0.22)' if enable_blur else '0 4px 12px rgba(0,0,0,0.2)'
-    blur_rule = 'backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur));' if enable_blur else 'backdrop-filter: none !important; -webkit-backdrop-filter: none !important;'
-
-    theme_vars = f"""
+def apply_theme():
+    st.markdown(
+        """
+        <style>
           :root {
             --bg: #0F1115;
             --bg-grad-a: rgba(47,129,247,0.08);
             --bg-grad-b: rgba(255,255,255,0.03);
-            --card: {card_bg};
-            --card-solid: #171A21;
-            --surface: rgba(17,20,26,0.75);
-            --surface-2: #141821;
+            --panel: rgba(18,20,26,0.92);
+            --panel-2: rgba(20,24,33,0.92);
             --text: rgba(255,255,255,0.92);
             --muted: rgba(255,255,255,0.6);
             --label: rgba(255,255,255,0.92);
             --placeholder: rgba(255,255,255,0.45);
             --border: rgba(255,255,255,0.10);
             --border-soft: rgba(255,255,255,0.06);
-            --border-strong: rgba(255,255,255,0.18);
             --input-border: rgba(255,255,255,0.18);
-            --input-bg: rgba(17,20,26,0.75);
+            --input-bg: rgba(17,20,26,0.95);
             --accent: #2F81F7;
-            --accent-hover: #3b89f7;
-            --sidebar-bg: {sidebar_bg};
+            --sidebar-bg: rgba(17,20,26,0.94);
             --sidebar-text: rgba(255,255,255,0.92);
-            --shadow: {shadow_main};
-            --shadow-soft: {shadow_soft};
-            --alert-bg: {alert_bg};
-            --success-accent: rgba(47,129,247,0.65);
-            --error-accent: rgba(255,80,80,0.9);
-            --radius: 16px;
-            --glass-blur: {blur_px};
+            --shadow: 0 8px 18px rgba(0,0,0,0.28);
+            --shadow-soft: 0 4px 12px rgba(0,0,0,0.22);
+            --alert-bg: rgba(20,22,28,0.94);
           }
-        """
-
-    table_even = 'var(--surface-2)'
-    table_odd = 'color-mix(in srgb, var(--card-solid) 92%, transparent)'
-
-    st.markdown(
-        f"""
-        <style>
-          {theme_vars}
-          html, body, [class*="css"], .stApp {{
-            font-family: {FONT_STACK};
+          html, body, [class*="css"], .stApp {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             color: var(--text) !important;
             background: var(--bg) !important;
-          }}
-          .stApp {{
-            background: var(--bg) !important;
-            color: var(--text) !important;
-            background-image: radial-gradient(circle at 8% 10%, var(--bg-grad-a), transparent 42%), radial-gradient(circle at 90% 0%, var(--bg-grad-b), transparent 48%) !important;
-          }}
-          {bg_css}
-          .block-container {{ padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1280px; }}
-          .block-container > div {{ background: transparent !important; }}
-          section[data-testid="stSidebar"] {{
+          }
+          .stApp {
+            background-color: var(--bg) !important;
+            background-image:
+              radial-gradient(circle at 12% 8%, var(--bg-grad-a), transparent 40%),
+              linear-gradient(160deg, #0f1115 0%, #121722 100%) !important;
+          }
+          .block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1280px; }
+          .block-container > div { background: transparent !important; }
+          section[data-testid="stSidebar"] {
             background: var(--sidebar-bg) !important;
             border-right: 1px solid var(--border-soft) !important;
-            {blur_rule}
-          }}
-          section[data-testid="stSidebar"] * {{ color: var(--sidebar-text) !important; }}
-          section[data-testid="stSidebar"] .stRadio label,
-          section[data-testid="stSidebar"] .stCaption {{ opacity: 0.95; }}
-          .card {{
-            background: var(--card);
+          }
+          section[data-testid="stSidebar"] * { color: var(--sidebar-text) !important; }
+          .card {
+            background: var(--panel);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 16px;
             box-shadow: var(--shadow);
             padding: 14px 16px;
-            {blur_rule}
-          }}
-          div[data-testid="stForm"] {{
-            background: var(--card);
+          }
+          div[data-testid="stForm"] {
+            background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 16px;
             box-shadow: var(--shadow-soft);
             padding: 0.75rem 0.75rem 0.25rem 0.75rem;
-            {blur_rule}
-          }}
-          .stTextInput label, .stNumberInput label, .stDateInput label, .stTextArea label, .stSelectbox label {{
+          }
+          .stTextInput label, .stNumberInput label, .stDateInput label, .stTextArea label, .stSelectbox label {
             color: var(--label) !important;
             opacity: 1 !important;
             font-weight: 600 !important;
-          }}
-          .kpi-grid {{ display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:12px; margin: 8px 0 14px; }}
-          .kpi-item {{ background: var(--card); border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow-soft); padding: 14px; {blur_rule} }}
-          .kpi-label {{ color: var(--muted); font-size: 0.82rem; }}
-          .kpi-value {{ font-weight: 650; font-size: 1.4rem; letter-spacing: -0.02em; }}
-          .muted {{ color: var(--muted); }}
-          div[data-testid="stMetric"] {{ background: var(--card); border:1px solid var(--border); border-radius:16px; padding:8px 10px; box-shadow: var(--shadow-soft); {blur_rule} }}
-          div[data-testid="stDataFrame"] {{ border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: var(--card) !important; }}
-          [data-testid="stTable"], [data-testid="stDataFrameResizable"] {{ background: var(--card) !important; }}
-          h1, h2, h3 {{ color: var(--text) !important; }}
-          p, li, span, label, div {{ color: inherit; }}
-          .stTextInput > div > div, .stTextArea textarea, .stDateInput > div > div, .stNumberInput > div > div, .stSelectbox > div > div {{
+          }
+          .kpi-grid { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:12px; margin: 8px 0 14px; }
+          .kpi-item { background: var(--panel); border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow-soft); padding: 14px; }
+          .kpi-label { color: var(--muted); font-size: 0.82rem; }
+          .kpi-value { font-weight: 650; font-size: 1.4rem; letter-spacing: -0.02em; }
+          .muted { color: var(--muted); }
+          div[data-testid="stMetric"] { background: var(--panel); border:1px solid var(--border); border-radius:16px; padding:8px 10px; box-shadow: var(--shadow-soft); }
+          div[data-testid="stDataFrame"] { border-radius: 16px; overflow: hidden; border: 1px solid var(--border); background: var(--panel) !important; }
+          [data-testid="stTable"], [data-testid="stDataFrameResizable"] { background: var(--panel) !important; }
+          h1, h2, h3 { color: var(--text) !important; }
+          p, li, span, label, div { color: inherit; }
+          .stTextInput > div > div, .stTextArea textarea, .stDateInput > div > div, .stNumberInput > div > div, .stSelectbox > div > div {
             border-radius: 12px !important;
             border: 1px solid var(--input-border) !important;
             background: var(--input-bg) !important;
-          }}
-          .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input {{
+          }
+          .stTextInput input, .stTextArea textarea, .stNumberInput input, .stDateInput input {
             color: var(--text) !important;
             background: var(--input-bg) !important;
             border-radius: 12px !important;
             border: 1px solid var(--input-border) !important;
-          }}
-          .stTextInput input::placeholder, .stTextArea textarea::placeholder, .stNumberInput input::placeholder, .stDateInput input::placeholder {{
+          }
+          .stTextInput input::placeholder, .stTextArea textarea::placeholder, .stNumberInput input::placeholder, .stDateInput input::placeholder {
             color: var(--placeholder) !important;
             opacity: 1 !important;
-          }}
-          .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus, .stDateInput input:focus {{
+          }
+          .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus, .stDateInput input:focus {
             outline: none !important;
             box-shadow: 0 0 0 2px rgba(47,129,247,0.25) !important;
             border-color: var(--accent) !important;
-          }}
-          .stNumberInput [data-baseweb="input"], .stDateInput [data-baseweb="input"] {{
+          }
+          .stNumberInput [data-baseweb="input"], .stDateInput [data-baseweb="input"] {
             border-radius: 12px !important;
             border: 1px solid var(--input-border) !important;
             background: var(--input-bg) !important;
-          }}
-          .stNumberInput [data-baseweb="input"]:focus-within, .stDateInput [data-baseweb="input"]:focus-within {{
+          }
+          .stNumberInput [data-baseweb="input"]:focus-within, .stDateInput [data-baseweb="input"]:focus-within {
             box-shadow: 0 0 0 2px rgba(47,129,247,0.25) !important;
             border-color: var(--accent) !important;
-          }}
-          .stSelectbox [data-baseweb="select"] {{
+          }
+          .stSelectbox [data-baseweb="select"] {
             background: var(--input-bg) !important;
             border: 1px solid var(--input-border) !important;
             border-radius: 12px !important;
-          }}
-          .stSelectbox [data-baseweb="select"] * {{ color: var(--text) !important; }}
-          .stButton button, .stDownloadButton button {{
+          }
+          .stSelectbox [data-baseweb="select"] * { color: var(--text) !important; }
+          .stButton button, .stDownloadButton button {
             border-radius: 12px;
             border: none !important;
             box-shadow: var(--shadow-soft);
             background: var(--accent) !important;
             color: white !important;
-            transition: all .14s ease;
-          }}
-          .stButton button:hover, .stDownloadButton button:hover {{ opacity: 0.92; }}
-          div[data-testid="stAlert"] {{
+          }
+          .stButton button:hover, .stDownloadButton button:hover {
+            background: #2371e0 !important;
+          }
+          div[data-testid="stAlert"] {
             border-radius: 12px;
             border: 1px solid var(--border);
             box-shadow: var(--shadow-soft);
             background: var(--alert-bg);
-            {blur_rule}
-          }}
-          div[data-testid="stAlert"] > div {{ background: transparent !important; }}
-          div[data-testid="stAlert"][kind="error"] {{ border-left: 4px solid var(--error-accent); border-color: rgba(255,80,80,0.18); }}
-          div[data-testid="stAlert"][kind="success"] {{ border-left: 4px solid var(--success-accent); border-color: rgba(47,129,247,0.16); }}
-          div[data-testid="stAlert"][kind="info"] {{ border-left: 4px solid rgba(47,129,247,0.55); border-color: rgba(47,129,247,0.14); }}
-          div[data-testid="stAlert"] * {{ color: var(--text) !important; }}
-          a {{ color: var(--accent); }}
-          thead tr {{ background: var(--surface) !important; }}
-          tbody tr {{ background: {table_odd} !important; }}
-          tbody tr:nth-child(even) {{ background: {table_even} !important; }}
-          [data-testid="stDataFrame"] table, [data-testid="stDataFrame"] th, [data-testid="stDataFrame"] td {{ color: var(--text) !important; }}
-          [data-testid="stToolbar"] {{ background: transparent !important; }}
-          [data-testid="stChart"] > div, .vega-embed, .vega-embed > details {{
-            background: var(--card) !important;
+          }
+          div[data-testid="stAlert"] > div { background: transparent !important; }
+          div[data-testid="stAlert"][kind="error"] { border-left: 4px solid rgba(255,80,80,0.9); border-color: rgba(255,80,80,0.2); }
+          div[data-testid="stAlert"][kind="success"] { border-left: 4px solid rgba(47,129,247,0.75); border-color: rgba(47,129,247,0.18); }
+          div[data-testid="stAlert"][kind="info"] { border-left: 4px solid rgba(47,129,247,0.55); border-color: rgba(47,129,247,0.16); }
+          div[data-testid="stAlert"] * { color: var(--text) !important; }
+          a { color: var(--accent); }
+          thead tr { background: rgba(17,20,26,0.95) !important; }
+          tbody tr { background: var(--panel) !important; }
+          tbody tr:nth-child(even) { background: var(--panel-2) !important; }
+          [data-testid="stDataFrame"] table, [data-testid="stDataFrame"] th, [data-testid="stDataFrame"] td { color: var(--text) !important; }
+          [data-testid="stToolbar"] { background: transparent !important; }
+          [data-testid="stChart"] > div, .vega-embed, .vega-embed > details {
+            background: var(--panel) !important;
             border-radius: 14px;
-            {blur_rule}
             color: var(--text) !important;
-          }}
-          @media (max-width: 900px) {{ .kpi-grid {{ grid-template-columns: 1fr 1fr; }} }}
-          @media (max-width: 560px) {{ .kpi-grid {{ grid-template-columns: 1fr; }} }}
+          }
+          @media (max-width: 900px) { .kpi-grid { grid-template-columns: 1fr 1fr; } }
+          @media (max-width: 560px) { .kpi-grid { grid-template-columns: 1fr; } }
         </style>
         """,
         unsafe_allow_html=True,
@@ -689,10 +587,6 @@ def _render_perf_debug():
         return
     lines = st.session_state.get('perf_lines', [])
     with st.sidebar.expander('Performance Debug', expanded=True):
-        browser_name = 'Safari' if st.session_state.get('is_safari', False) else 'Non-Safari'
-        st.caption(f'Browser erkannt: {browser_name}')
-        st.caption(f'Blur enabled: {bool(st.session_state.get("enable_blur", False))}')
-        st.caption(f'UA source: {st.session_state.get("browser_ua_source", "unknown")}')
         if not lines:
             st.caption('Keine Messwerte in diesem Run.')
         else:
@@ -702,24 +596,13 @@ def _render_perf_debug():
 def main():
     st.set_page_config(page_title='pool-cost-tracker', layout='wide')
     _perf_reset()
-    is_safari, _ua = detect_browser_flags()
-    st.session_state['is_safari'] = is_safari
 
     st.sidebar.markdown('## Poolkosten')
     st.sidebar.caption('Kostenübersicht')
-    if 'enable_blur' not in st.session_state:
-        st.session_state['enable_blur'] = not is_safari
-    st.session_state['enable_blur'] = st.sidebar.checkbox(
-        'Blur aktivieren (experimentell)',
-        value=bool(st.session_state.get('enable_blur', not is_safari)),
-        help='In Safari standardmäßig deaktiviert, um Rendering-Hänger zu vermeiden.',
-    )
-    if is_safari:
-        st.sidebar.caption('Safari erkannt: Blur ist standardmäßig deaktiviert.')
     st.session_state['perf_debug'] = st.sidebar.checkbox('Debug Performance', value=st.session_state.get('perf_debug', False))
     st.sidebar.caption(f'API: {API_BASE_URL}')
 
-    apply_theme(enable_blur=bool(st.session_state.get('enable_blur', False)))
+    apply_theme()
 
     page = st.sidebar.radio('Seiten', ['Dashboard', 'Paperless-Rechnungen', 'Manuelle Kosten', 'Export'])
 
