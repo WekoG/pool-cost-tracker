@@ -348,12 +348,21 @@ def fmt_eur(value):
     return f'{float(value):,.2f} EUR'.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def project_name_from_config(config: dict) -> str:
+    return str(config.get('project_name') or 'Pool').strip() or 'Pool'
+
+
+def project_tag_from_config(config: dict) -> str:
+    value = str(config.get('project_tag_name') or config.get('pool_tag_name') or 'Pool').strip()
+    return value or 'Pool'
+
+
 def section_card(title: str, subtitle: str | None = None):
     subtitle_html = f'<div class="muted">{subtitle}</div>' if subtitle else ''
     st.markdown(f'<div class="card"><h3 style="margin:0 0 4px 0;">{title}</h3>{subtitle_html}</div>', unsafe_allow_html=True)
 
 
-def dashboard_page():
+def dashboard_page(config: dict):
     st.title('Dashboard')
 
     col_sync, col_info = st.columns([1, 2])
@@ -368,13 +377,10 @@ def dashboard_page():
                 st.error(f'Sync fehlgeschlagen: {exc}')
 
     with col_info:
-        cfg_start = perf_counter()
-        cfg = get_config_cached()
-        _perf_add('load config', (perf_counter() - cfg_start) * 1000, 'cache ttl 30s')
         st.markdown(
-            f"<div class='card'><div><b>Scheduler</b>: {'aktiv' if cfg['scheduler_enabled'] else 'inaktiv'}</div>"
-            f"<div class='muted'>Intervall: {cfg['scheduler_interval_minutes']} min | Run on startup: {cfg['scheduler_run_on_startup']}</div>"
-            f"<div class='muted'>Paperless Base URL: {cfg['paperless_base_url']}</div></div>",
+            f"<div class='card'><div><b>Projekt</b>: {project_name_from_config(config)}</div>"
+            f"<div class='muted'>Paperless: {config['paperless_base_url']} | Scheduler: {'aktiv' if config['scheduler_enabled'] else 'inaktiv'} ({config['scheduler_interval_minutes']} min)</div>"
+            f"<div class='muted'>Tag: {project_tag_from_config(config)} | Run on startup: {config['scheduler_run_on_startup']}</div></div>",
             unsafe_allow_html=True,
         )
 
@@ -434,16 +440,31 @@ def invoices_page():
         }
 
     with st.form('invoice_filter_form'):
-        f1, f2, f3, f4 = st.columns([1, 2, 1, 1])
+        f1, f2, f3, f4 = st.columns([3, 3, 3, 1])
         with f1:
-            needs_review_filter = st.selectbox('Needs Review', ['Alle', 'Ja', 'Nein'], index=['Alle', 'Ja', 'Nein'].index(st.session_state['invoices_filters']['needs_review']))
+            needs_review_filter = st.selectbox(
+                'Needs Review',
+                ['Alle', 'Ja', 'Nein'],
+                index=['Alle', 'Ja', 'Nein'].index(st.session_state['invoices_filters']['needs_review']),
+                use_container_width=True,
+            )
         with f2:
-            search = st.text_input('Unternehmen/Titel suchen', value=st.session_state['invoices_filters']['search'], placeholder='z. B. Poolbau')
+            search = st.text_input(
+                'Unternehmen/Titel',
+                value=st.session_state['invoices_filters']['search'],
+                placeholder='z. B. Poolbau',
+            )
         with f3:
-            sort = st.selectbox('Sortierung', ['date_desc', 'amount_desc', 'vendor_asc'], index=['date_desc', 'amount_desc', 'vendor_asc'].index(st.session_state['invoices_filters']['sort']))
+            sort = st.selectbox(
+                'Sortierung',
+                ['date_desc', 'amount_desc', 'vendor_asc'],
+                index=['date_desc', 'amount_desc', 'vendor_asc'].index(st.session_state['invoices_filters']['sort']),
+                use_container_width=True,
+            )
         with f4:
-            limit = st.selectbox('Max Zeilen', [50, 100, 200, 500], index=[50, 100, 200, 500].index(st.session_state['invoices_filters']['limit']))
-        apply_filters = st.form_submit_button('Anwenden')
+            apply_filters = st.form_submit_button('Anwenden', use_container_width=True)
+
+    limit = st.session_state['invoices_filters']['limit']
 
     if apply_filters:
         st.session_state['invoices_filters'] = {
@@ -609,19 +630,22 @@ def main():
     inject_no_cache_meta()
     _perf_reset()
 
-    st.sidebar.markdown('## Poolkosten')
-    st.sidebar.caption('Kostenübersicht')
-    st.session_state['perf_debug'] = st.sidebar.checkbox('Debug Performance', value=st.session_state.get('perf_debug', False))
-    st.sidebar.caption(f'API: {API_BASE_URL}')
-
     apply_theme()
 
-    page = st.sidebar.radio('Seiten', ['Dashboard', 'Paperless-Rechnungen', 'Manuelle Kosten', 'Export'])
-
     try:
+        cfg_start = perf_counter()
+        config = get_config_cached()
+        _perf_add('load config', (perf_counter() - cfg_start) * 1000, 'cache ttl 30s')
+
+        st.sidebar.markdown(f"## {project_name_from_config(config)}")
+        st.sidebar.caption(f"Kostenübersicht | Tag: {project_tag_from_config(config)}")
+        st.session_state['perf_debug'] = st.sidebar.checkbox('Debug Performance', value=st.session_state.get('perf_debug', False))
+        st.sidebar.caption(f'API: {API_BASE_URL}')
+
+        page = st.sidebar.radio('Seiten', ['Dashboard', 'Paperless-Rechnungen', 'Manuelle Kosten', 'Export'])
         render_start = perf_counter()
         if page == 'Dashboard':
-            dashboard_page()
+            dashboard_page(config)
         elif page == 'Paperless-Rechnungen':
             invoices_page()
         elif page == 'Manuelle Kosten':

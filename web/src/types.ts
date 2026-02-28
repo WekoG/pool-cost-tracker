@@ -6,6 +6,8 @@ export interface HealthResponse {
 
 export interface ConfigResponse {
   paperless_base_url: string
+  project_name: string
+  project_tag_name: string
   pool_tag_name: string
   scheduler_enabled: boolean
   scheduler_interval_minutes: number

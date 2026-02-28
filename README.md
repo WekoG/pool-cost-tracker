@@ -1,11 +1,11 @@
 # pool-cost-tracker
 
-Lokale WebApp (FastAPI + React/Vite) zur Auswertung von Pool-Kosten aus Paperless-ngx (Tag-Filter `Pool`) plus manuellen Kostenpositionen.
+Lokale WebApp (FastAPI + React/Vite) zur Auswertung projektbezogener Kosten aus Paperless-ngx plus manuellen Kostenpositionen. Projektname und Paperless-Tag sind per Environment konfigurierbar.
 
 ## Features
 
 - Sync von Paperless-ngx per REST API (`POST /sync`)
-- Filter nur auf Tag `POOL_TAG_NAME` (Default `Pool`)
+- Filter auf konfigurierbares Projekt-Tag (`PROJECT_TAG_NAME`, Default `Pool`)
 - OCR-Extraktion von Unternehmen + Brutto/Endbetrag (EUR)
 - Speicherung in SQLite (`invoices`, `manual_costs`)
 - Manuelle Kostenpositionen
@@ -33,13 +33,20 @@ Pflicht-Variablen (API startet sonst nicht):
 
 Optionale Variablen (mit App-Defaults):
 
-- `POOL_TAG_NAME` (Default: `Pool`)
+- `PROJECT_NAME` (Default: `Pool`)
+- `PROJECT_TAG_NAME` (Default: `Pool`)
+- `POOL_TAG_NAME` (Legacy-Fallback, nur wenn `PROJECT_TAG_NAME` nicht gesetzt ist)
 - `SYNC_PAGE_SIZE` (Default: `100`)
 - `SYNC_LOOKBACK_DAYS` (Default: `365`)
 - `DATABASE_URL` (Default: `sqlite:////data/app.db`)
 - `SCHEDULER_ENABLED` (Default: `false`)
 - `SCHEDULER_INTERVAL_MINUTES` (Default: `360`)
 - `SCHEDULER_RUN_ON_STARTUP` (Default: `true`)
+
+Beispiel für ein anderes Projekt im Portainer Stack:
+
+- `PROJECT_NAME=Gartenhaus`
+- `PROJECT_TAG_NAME=Gartenhaus`
 
 UI:
 
@@ -99,7 +106,7 @@ PYTHONPATH=. pytest -q
 
 ## Paperless API Nutzung
 
-1. `GET ${PAPERLESS_BASE_URL}/api/tags/` (paginierend), exakter Match `name == POOL_TAG_NAME`
-2. `GET ${PAPERLESS_BASE_URL}/api/documents/?tags__id=<pool_tag_id>&page_size=<SYNC_PAGE_SIZE>&ordering=-created&truncate_content=false`
+1. `GET ${PAPERLESS_BASE_URL}/api/tags/` (paginierend), exakter Match `name == PROJECT_TAG_NAME`
+2. `GET ${PAPERLESS_BASE_URL}/api/documents/?tags__id=<project_tag_id>&page_size=<SYNC_PAGE_SIZE>&ordering=-created&truncate_content=false`
 
 Wenn der Tag fehlt, bricht der Sync mit klarer Fehlermeldung ab.

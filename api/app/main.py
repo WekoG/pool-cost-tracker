@@ -103,6 +103,8 @@ def get_config():
     settings = get_settings()
     return ConfigOut(
         paperless_base_url=settings.PAPERLESS_BASE_URL,
+        project_name=settings.PROJECT_NAME,
+        project_tag_name=settings.PROJECT_TAG_NAME,
         pool_tag_name=settings.POOL_TAG_NAME,
         scheduler_enabled=settings.SCHEDULER_ENABLED,
         scheduler_interval_minutes=settings.SCHEDULER_INTERVAL_MINUTES,
@@ -132,7 +134,7 @@ async def run_sync(db: Session = Depends(get_db)):
         if message.startswith("Tag '") and 'nicht gefunden' in message:
             raise HTTPException(
                 status_code=404,
-                detail=f"{message} (POOL_TAG_NAME={settings.POOL_TAG_NAME})",
+                detail=f"{message} (PROJECT_TAG_NAME={settings.PROJECT_TAG_NAME})",
             ) from exc
         raise HTTPException(status_code=422, detail=message) from exc
     except ValueError as exc:

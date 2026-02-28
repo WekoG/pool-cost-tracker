@@ -15,8 +15,8 @@ from .settings import Settings
 
 async def sync_invoices(db: Session, settings: Settings) -> SyncResponse:
     client = PaperlessClient(settings)
-    pool_tag_id = await client.get_tag_id_by_name()
-    docs = await client.get_pool_documents(pool_tag_id)
+    project_tag_id = await client.get_tag_id_by_name()
+    docs = await client.get_project_documents(project_tag_id)
 
     existing = {}
     if docs:
@@ -92,4 +92,4 @@ async def sync_invoices(db: Session, settings: Settings) -> SyncResponse:
             skipped += 1
 
     db.commit()
-    return SyncResponse(synced=len(docs), inserted=inserted, updated=updated, skipped=skipped, pool_tag_id=pool_tag_id)
+    return SyncResponse(synced=len(docs), inserted=inserted, updated=updated, skipped=skipped, pool_tag_id=project_tag_id)

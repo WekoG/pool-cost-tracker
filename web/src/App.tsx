@@ -70,7 +70,6 @@ function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null)
   const [config, setConfig] = useState<ConfigResponse | null>(null)
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
-  const [summaryLoading, setSummaryLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
 
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceFilters>({
@@ -165,14 +164,11 @@ function App() {
   }
 
   async function loadSummary() {
-    setSummaryLoading(true)
     try {
       const response = await api.get<SummaryResponse>('/summary')
       setSummary(response.data)
     } catch (error) {
       showNotice('error', extractApiError(error))
-    } finally {
-      setSummaryLoading(false)
     }
   }
 
@@ -346,12 +342,15 @@ function App() {
   const topCategories = useMemo(() => summary?.costs_by_category ?? [], [summary])
   const maxVendorAmount = Math.max(...topVendors.map((item) => item.amount), 1)
   const maxCategoryAmount = Math.max(...topCategories.map((item) => item.amount), 1)
+  const projectName = config?.project_name?.trim() || 'Pool'
+  const projectTagName = config?.project_tag_name?.trim() || config?.pool_tag_name?.trim() || 'Pool'
+  const schedulerStatus = config?.scheduler_enabled ? 'aktiv' : 'inaktiv'
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div>
-          <div className="sidebar-title">Poolkosten</div>
+          <div className="sidebar-title">{projectName}</div>
           <div className="sidebar-subtitle">Kostenübersicht</div>
         </div>
 
@@ -379,17 +378,13 @@ function App() {
       <main className="main-shell">
         <header className="topbar panel">
           <div>
-            <div className="topbar-title">Poolkosten</div>
+            <div className="topbar-title">{projectName}</div>
             <div className="muted-text">
-              Paperless: {config?.paperless_base_url ?? 'lädt...'} | Scheduler:{' '}
-              {config?.scheduler_enabled ? 'aktiv' : 'inaktiv'}
-              {config ? ` (${config.scheduler_interval_minutes} min)` : ''}
+              Kostenübersicht | Paperless: {config?.paperless_base_url ?? 'lädt...'} | Scheduler: {schedulerStatus}
+              {config ? ` (${config.scheduler_interval_minutes} min)` : ''} | Tag: {projectTagName}
             </div>
           </div>
           <div className="topbar-actions">
-            <button className="secondary-button" onClick={() => void loadSummary()} disabled={summaryLoading}>
-              Aktualisieren
-            </button>
             <button className="primary-button" onClick={() => void handleSync()} disabled={syncing}>
               {syncing ? 'Synchronisiert…' : 'Sync jetzt'}
             </button>

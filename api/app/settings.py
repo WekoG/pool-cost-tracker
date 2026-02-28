@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from functools import lru_cache
 import os
+from typing import Optional
 
 from pydantic import Field, ValidationError
 try:
@@ -23,7 +26,9 @@ class Settings(BaseSettings):
 
     PAPERLESS_BASE_URL: str
     PAPERLESS_TOKEN: str
-    POOL_TAG_NAME: str = Field(default='Pool')
+    PROJECT_NAME: str = Field(default='Pool')
+    PROJECT_TAG_NAME: Optional[str] = Field(default=None)
+    POOL_TAG_NAME: Optional[str] = Field(default=None)
     SYNC_PAGE_SIZE: int = Field(default=100)
     SYNC_LOOKBACK_DAYS: int = Field(default=365)
     DATABASE_URL: str = Field(default='sqlite:////data/app.db')
@@ -62,4 +67,15 @@ def get_settings() -> Settings:
             + ', '.join(missing_empty)
             + '. Bitte im Portainer Stack unter Environment setzen.'
         )
+
+    project_name = (settings.PROJECT_NAME or '').strip() or 'Pool'
+    project_tag_name = (settings.PROJECT_TAG_NAME or '').strip()
+    if not project_tag_name:
+        project_tag_name = (settings.POOL_TAG_NAME or '').strip()
+    if not project_tag_name:
+        project_tag_name = 'Pool'
+
+    settings.PROJECT_NAME = project_name
+    settings.PROJECT_TAG_NAME = project_tag_name
+    settings.POOL_TAG_NAME = project_tag_name
     return settings

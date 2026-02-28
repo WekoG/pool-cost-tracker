@@ -42,16 +42,16 @@ class PaperlessClient:
             while next_path:
                 page = await self._get_page(client, self._to_path(next_path))
                 for tag in page.get('results', []):
-                    if tag.get('name') == self.settings.POOL_TAG_NAME:
+                    if tag.get('name') == self.settings.PROJECT_TAG_NAME:
                         return int(tag['id'])
                 next_path = self._to_path(page['next']) if page.get('next') else ''
-        raise PaperlessError(f"Tag '{self.settings.POOL_TAG_NAME}' nicht gefunden")
+        raise PaperlessError(f"Tag '{self.settings.PROJECT_TAG_NAME}' nicht gefunden")
 
-    async def get_pool_documents(self, pool_tag_id: int) -> list[dict[str, Any]]:
+    async def get_project_documents(self, project_tag_id: int) -> list[dict[str, Any]]:
         documents: list[dict[str, Any]] = []
         cutoff = datetime.now(timezone.utc) - timedelta(days=self.settings.SYNC_LOOKBACK_DAYS)
         params: dict[str, Any] | None = {
-            'tags__id': pool_tag_id,
+            'tags__id': project_tag_id,
             'page_size': self.settings.SYNC_PAGE_SIZE,
             'ordering': '-created',
             'truncate_content': 'false',

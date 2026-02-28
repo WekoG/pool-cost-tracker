@@ -30,7 +30,7 @@ def _make_db_session():
 
 
 def _settings() -> Settings:
-    return Settings(PAPERLESS_TOKEN='dummy-token', PAPERLESS_BASE_URL='http://paperless.local:8000', POOL_TAG_NAME='Pool')
+    return Settings(PAPERLESS_TOKEN='dummy-token', PAPERLESS_BASE_URL='http://paperless.local:8000', PROJECT_TAG_NAME='Pool')
 
 
 def _install_fake_sync(monkeypatch, extracted_vendor='Auto GmbH', extracted_amount=123.45):
@@ -41,7 +41,7 @@ def _install_fake_sync(monkeypatch, extracted_vendor='Auto GmbH', extracted_amou
         async def get_tag_id_by_name(self):
             return 99
 
-        async def get_pool_documents(self, pool_tag_id: int):
+        async def get_project_documents(self, pool_tag_id: int):
             return [
                 {
                     'id': 1,

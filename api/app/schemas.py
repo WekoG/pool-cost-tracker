@@ -98,6 +98,8 @@ class SummaryOut(BaseModel):
 
 class ConfigOut(BaseModel):
     paperless_base_url: str
+    project_name: str
+    project_tag_name: str
     pool_tag_name: str
     scheduler_enabled: bool
     scheduler_interval_minutes: int

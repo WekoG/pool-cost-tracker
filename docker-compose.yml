@@ -6,6 +6,8 @@ services:
     environment:
       - PAPERLESS_BASE_URL
       - PAPERLESS_TOKEN
+      - PROJECT_NAME
+      - PROJECT_TAG_NAME
       - POOL_TAG_NAME
       - SYNC_PAGE_SIZE
       - SYNC_LOOKBACK_DAYS

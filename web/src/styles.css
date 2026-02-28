@@ -292,7 +292,7 @@ a {
 }
 
 .form-grid-filters {
-  grid-template-columns: 1fr 2fr 1fr auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: end;
 }
 
@@ -311,6 +311,10 @@ a {
   display: flex;
   align-items: flex-end;
   height: 100%;
+}
+
+.filter-action .primary-button {
+  min-height: 47px;
 }
 
 input,
