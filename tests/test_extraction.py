@@ -10,6 +10,7 @@ from api.app.extraction import extract_invoice_fields, parse_eur_amount
     [
         ('1.234,56', 1234.56),
         ('1234,56', 1234.56),
+        ('1 234,56', 1234.56),
         ('1234.56', 1234.56),
         ('12 EUR', 12.0),
     ],
@@ -96,6 +97,8 @@ def test_debug_json_contains_expected_fields_and_top_candidates():
     assert 'vendor_source' in debug
     assert 'candidates_checked' in debug
     assert 'top_candidates' in debug
+    assert 'matched_keywords' in debug['top_candidates'][0]
+    assert len(debug['top_candidates'][0]['line_snippet']) <= 120
 
 
 def test_confidence_higher_with_correspondent_than_without():
@@ -145,7 +148,7 @@ def test_prefers_payable_total_over_net_and_tax():
 
 def test_ignores_discount_line_and_selects_total():
     text = '\n'.join([
-        'Rabatt 50,00 EUR',
+        'Rabatt -50,00 EUR',
         'Summe 450,00 EUR',
         'Zu zahlen 450,00 EUR',
     ])
@@ -167,7 +170,8 @@ def test_multiple_sum_lines_prefers_endbetrag():
     text = '\n'.join([
         'Zwischensumme 780,00 EUR',
         'Summe 900,00 EUR',
-        'Endbetrag 900,00 EUR',
+        'Brutto 900,00 EUR',
+        'Zu zahlen 900,00 EUR',
     ])
     result = extract_invoice_fields(text, 'ACME GmbH')
     assert result['amount'] == 900.00
@@ -201,6 +205,14 @@ def test_credit_note_negative_amount_is_not_used():
     result = extract_invoice_fields(text, 'ACME GmbH')
     assert result['amount'] is None
     assert result['needs_review'] is True
+
+
+def test_negative_credit_note_debug_keeps_negative_candidates_visible():
+    result = extract_invoice_fields('Gutschrift\nZu zahlen -120,00 EUR', 'ACME GmbH')
+    debug = json.loads(result['debug_json'])
+
+    assert debug['top_candidates'][0]['value'] == 120.0
+    assert 'zu zahlen' in debug['top_candidates'][0]['matched_keywords']['positive']
 
 
 def test_thousands_separator_with_comma_is_supported():

@@ -15,6 +15,7 @@ POSITIVE_KEYWORDS = [
     'total',
     'gesamt',
     'summe',
+    'betrag',
 ]
 
 NEGATIVE_KEYWORDS = [
@@ -34,12 +35,13 @@ NEUTRAL_KEYWORDS = [
     'ust',
     'steuer',
     'mehrwertsteuer',
+    'zwischen',
     'zwischenbetrag',
     'zwischensumme',
 ]
 
 LETTER_CLASS = 'A-Za-zÄÖÜäöüß'
-AMOUNT_REGEX = r'(?P<amount>\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2}|\d+\.\d{2}|\d+)'
+AMOUNT_REGEX = r'(?P<amount>(?:\d{1,3}(?:[.\s]\d{3})+|\d+)(?:,\d{2}|\.\d{2})?|\d+)'
 AMOUNT_PATTERN = re.compile(AMOUNT_REGEX + r'(?:\s?(?:EUR|€))?', flags=re.IGNORECASE)
 EMAIL_RE = re.compile(r'\b[\w.%-]+@[\w.-]+\.[A-Za-z]{2,}\b')
 ARTIFACT_RE = re.compile(
@@ -57,13 +59,14 @@ class AmountCandidate:
     start: int
     end: int
     context: str
-    currency_near: bool
-    negative_near: bool
+    has_currency_nearby: bool
+    is_negative: bool
     pos_same_line: list[str]
     pos_context: list[str]
     neg_same_line: list[str]
     neg_context: list[str]
     neutral_same_line: list[str]
+    neutral_context: list[str]
     score: int
 
 
@@ -78,15 +81,19 @@ def parse_eur_amount(raw: str) -> float | None:
     if not value:
         return None
 
+    value = re.sub(r'(?<=\d)\s+(?=\d)', '', value)
+
     if ',' in value and '.' in value:
         if value.rfind(',') > value.rfind('.'):
             normalized = value.replace('.', '').replace(',', '.')
         else:
             normalized = value.replace(',', '')
+    elif ',' in value and ' ' in value:
+        normalized = value.replace(' ', '').replace(',', '.')
     elif ',' in value:
-        normalized = value.replace('.', '').replace(',', '.')
+        normalized = value.replace(' ', '').replace('.', '').replace(',', '.')
     else:
-        normalized = value
+        normalized = value.replace(' ', '')
 
     try:
         return round(float(normalized), 2)
@@ -131,10 +138,13 @@ def _currency_near(text: str, start: int, end: int) -> bool:
     return bool(re.search(r'(€|\bEUR\b)', nearby, flags=re.IGNORECASE))
 
 
-def _negative_near(text: str, start: int) -> bool:
-    left = max(0, start - 3)
-    near = text[left:start]
-    return '-' in near
+def _is_negative_near(text: str, start: int, end: int) -> bool:
+    left = max(0, start - 4)
+    right = min(len(text), end + 2)
+    nearby = text[left:right]
+    left_side = nearby[: start - left]
+    compact_left = re.sub(r'\s+', '', left_side)
+    return compact_left.endswith('-') or compact_left.endswith('−') or compact_left.endswith('(')
 
 
 def _score_candidate(candidate: AmountCandidate) -> int:
@@ -149,9 +159,9 @@ def _score_candidate(candidate: AmountCandidate) -> int:
         score -= 35
     if candidate.neutral_same_line:
         score -= 15
-    if candidate.currency_near:
+    if candidate.has_currency_nearby:
         score += 10
-    if candidate.negative_near:
+    if candidate.is_negative:
         score -= 50
     return score
 
@@ -184,6 +194,12 @@ def _amount_candidates(text: str) -> list[AmountCandidate]:
             neg_same = _find_keywords(line, NEGATIVE_KEYWORDS)
             neg_context = _find_keywords(context, NEGATIVE_KEYWORDS)
             neutral_same = _find_keywords(line, NEUTRAL_KEYWORDS)
+            neutral_context = _find_keywords(context, NEUTRAL_KEYWORDS)
+            has_currency_nearby = _currency_near(text, global_start, global_end)
+            is_negative = _is_negative_near(text, global_start, global_end)
+
+            if ',' not in raw and '.' not in raw and not has_currency_nearby:
+                continue
 
             candidate = AmountCandidate(
                 amount=amount,
@@ -193,21 +209,20 @@ def _amount_candidates(text: str) -> list[AmountCandidate]:
                 start=global_start,
                 end=global_end,
                 context=context,
-                currency_near=_currency_near(text, global_start, global_end),
-                negative_near=_negative_near(text, global_start),
+                has_currency_nearby=has_currency_nearby,
+                is_negative=is_negative,
                 pos_same_line=pos_same,
                 pos_context=pos_context,
                 neg_same_line=neg_same,
                 neg_context=neg_context,
                 neutral_same_line=neutral_same,
+                neutral_context=neutral_context,
                 score=0,
             )
             candidate.score = _score_candidate(candidate)
 
             # Plausibility constraints
             if candidate.amount <= 0 or candidate.amount > 1_000_000:
-                continue
-            if candidate.negative_near:
                 continue
 
             candidates.append(candidate)
@@ -222,11 +237,15 @@ def _choose_candidate(candidates: list[AmountCandidate]) -> AmountCandidate | No
     def tie_amount(c: AmountCandidate) -> float:
         return c.amount if not c.neg_same_line else 0.0
 
-    return sorted(
+    return max(
         candidates,
-        key=lambda c: (c.score, bool(c.pos_same_line), tie_amount(c)),
-        reverse=True,
-    )[0]
+        key=lambda c: (
+            c.score,
+            bool(c.pos_same_line),
+            tie_amount(c),
+            -c.line_index,
+        ),
+    )
 
 
 def _pick_vendor(text: str, correspondent: str | None) -> VendorCandidate:
@@ -258,23 +277,24 @@ def _pick_vendor(text: str, correspondent: str | None) -> VendorCandidate:
 
 
 def _build_debug_top(candidates: list[AmountCandidate]) -> list[dict]:
-    ranked = sorted(candidates, key=lambda c: (c.score, bool(c.pos_same_line), c.amount), reverse=True)[:5]
+    ranked = sorted(
+        candidates,
+        key=lambda c: (c.score, bool(c.pos_same_line), c.amount, -c.line_index),
+        reverse=True,
+    )[:5]
     top: list[dict] = []
     for c in ranked:
-        triggered = {
-            'pos_same_line': c.pos_same_line,
-            'pos_context': c.pos_context,
-            'neg_same_line': c.neg_same_line,
-            'neg_context': c.neg_context,
-            'neutral_same_line': c.neutral_same_line,
-            'currency_near': c.currency_near,
+        matched_keywords = {
+            'positive': sorted(set(c.pos_same_line + c.pos_context)),
+            'negative': sorted(set(c.neg_same_line + c.neg_context)),
+            'neutral': sorted(set(c.neutral_same_line + c.neutral_context)),
         }
         top.append(
             {
                 'value': c.amount,
                 'score': c.score,
-                'line_snippet': c.line_text[:160],
-                'triggered_keywords': triggered,
+                'line_snippet': c.line_text[:120],
+                'matched_keywords': matched_keywords,
             }
         )
     return top
@@ -286,10 +306,15 @@ def extract_invoice_fields(text: str, correspondent: str | None) -> dict:
     candidates = _amount_candidates(text)
     chosen = _choose_candidate(candidates)
 
-    amount = chosen.amount if chosen else None
+    amount = chosen.amount if chosen and not chosen.is_negative else None
 
     low_signal = chosen is None or chosen.score < 25
-    only_neutral = bool(chosen and not chosen.pos_same_line and not chosen.pos_context and chosen.neutral_same_line)
+    only_neutral = bool(
+        chosen
+        and not chosen.pos_same_line
+        and not chosen.pos_context
+        and (chosen.neutral_same_line or chosen.neutral_context)
+    )
     needs_review_amount = low_signal or only_neutral
     needs_review = needs_review_amount or not vendor_candidate.value
 
@@ -319,6 +344,7 @@ def extract_invoice_fields(text: str, correspondent: str | None) -> dict:
             'chosen_raw': chosen.raw if chosen else None,
             'chosen_score': chosen.score if chosen else None,
             'chosen_line': chosen.line_text[:200] if chosen else None,
+            'chosen_is_negative': chosen.is_negative if chosen else None,
             'needs_review_amount_reason': {
                 'low_signal': low_signal,
                 'only_neutral': only_neutral,
