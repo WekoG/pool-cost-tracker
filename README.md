@@ -21,6 +21,12 @@ Lokale WebApp (FastAPI + React/Vite) zur Auswertung projektbezogener Kosten aus 
 - DB: SQLite (`/data`)
 - Tests: pytest
 
+## Architecture
+
+- FastAPI API
+- React SPA
+- Nginx als statischer Webserver fuer die gebaute React-App mit `/api` Proxy auf FastAPI
+
 ## Deployment mit Portainer
 
 Dieses Projekt verwendet **keine `.env` Datei** mehr.
@@ -30,6 +36,11 @@ Pflicht-Variablen (API startet sonst nicht):
 
 - `PAPERLESS_BASE_URL`
 - `PAPERLESS_TOKEN`
+
+Projekt-Variablen:
+
+- `PROJECT_NAME`
+- `PROJECT_TAG_NAME`
 
 Optionale Variablen (mit App-Defaults):
 
@@ -62,7 +73,7 @@ docker compose up --build
 
 ## Aufruf
 
-- UI: `http://<host>:8501`
+- UI: `http://<host>:8502`
 - API (externes Mapping): `http://<host>:18000/docs`
 
 ## Scheduler
@@ -93,7 +104,7 @@ docker compose exec api alembic upgrade head
 
 - Die produktive UI liegt unter `/Users/weko/Documents/Codex/Pool_Kosten/web`
 - `web/nginx/default.conf` servt die SPA und proxyt `/api/*` intern auf `api:8000`
-- Der alte Streamlit-Ordner `/Users/weko/Documents/Codex/Pool_Kosten/ui` bleibt nur als Legacy-Referenz erhalten und wird von Docker Compose nicht mehr verwendet
+- Docker Compose startet nur noch den React+Nginx-Container als `ui`
 
 ## Tests
 
