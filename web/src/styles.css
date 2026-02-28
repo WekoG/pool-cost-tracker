@@ -145,10 +145,10 @@ a {
 }
 
 .main-shell {
-  padding: 24px;
+  padding: 16px;
   display: grid;
   grid-template-rows: auto auto 1fr;
-  gap: 18px;
+  gap: 16px;
 }
 
 .panel {
@@ -170,9 +170,10 @@ a {
 
 .topbar-head {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
 .topbar-main {
@@ -186,10 +187,12 @@ a {
 
 .topbar-status {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
-  align-items: center;
+  gap: 12px;
+  align-items: stretch;
+  width: 100%;
 }
 
 .status-meta {
@@ -242,6 +245,7 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
 }
 
 .primary-button,
@@ -261,7 +265,7 @@ a {
 .range-toolbar {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 16px;
   align-items: end;
 }
 
@@ -317,7 +321,7 @@ a {
 .page-grid,
 .page-stack {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .metrics-grid {
@@ -327,7 +331,7 @@ a {
 }
 
 .metric-card {
-  padding: 16px 18px;
+  padding: 16px;
 }
 
 .metric-value {
@@ -340,7 +344,7 @@ a {
 .content-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 18px;
+  gap: 16px;
 }
 
 .panel h2 {
@@ -359,13 +363,13 @@ a {
 .table-wrap,
 .form-grid,
 .actions-row {
-  padding-left: 18px;
-  padding-right: 18px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .panel > h2,
 .section-header {
-  padding-top: 18px;
+  padding-top: 16px;
 }
 
 .section-header {
@@ -383,7 +387,7 @@ a {
 .table-wrap,
 .form-grid {
   padding-top: 16px;
-  padding-bottom: 18px;
+  padding-bottom: 16px;
 }
 
 .bar-list {
@@ -464,11 +468,12 @@ select,
 textarea {
   width: 100%;
   min-height: 44px;
+  height: 44px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(17, 20, 26, 0.95);
   color: rgba(255, 255, 255, 0.92);
-  padding: 12px 13px;
+  padding: 10px 13px;
 }
 
 select {
@@ -476,9 +481,12 @@ select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  padding-right: 40px;
+  background-position: right 14px center;
 }
 
 textarea {
+  height: auto;
   min-height: 120px;
   resize: vertical;
 }
@@ -492,10 +500,10 @@ textarea:focus {
 
 .table-wrap {
   overflow-x: auto;
-  margin-left: -18px;
-  margin-right: -18px;
-  padding-left: 18px;
-  padding-right: 18px;
+  margin-left: -16px;
+  margin-right: -16px;
+  padding-left: 16px;
+  padding-right: 16px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -567,7 +575,7 @@ thead th {
 .mobile-card-list {
   display: grid;
   gap: 14px;
-  padding: 16px 18px 18px;
+  padding: 16px;
 }
 
 .mobile-card {
@@ -676,12 +684,12 @@ thead th {
 }
 
 .inbox-panel {
-  padding-bottom: 18px;
+  padding-bottom: 16px;
 }
 
 .inbox-card {
-  padding-left: 18px;
-  padding-right: 18px;
+  padding-left: 16px;
+  padding-right: 16px;
   display: grid;
   gap: 18px;
 }
@@ -839,6 +847,85 @@ thead th {
     display: block;
   }
 
+  .main-shell {
+    padding: 24px;
+    gap: 18px;
+  }
+
+  .topbar-head {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .topbar-status {
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    width: auto;
+    gap: 10px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .table-button,
+  .notice-close,
+  .link-button {
+    width: auto;
+  }
+
+  .page-grid,
+  .page-stack,
+  .content-grid {
+    gap: 18px;
+  }
+
+  .metric-card {
+    padding: 16px 18px;
+  }
+
+  .panel > h2,
+  .panel > .muted-text,
+  .section-header,
+  .bar-list,
+  .table-wrap,
+  .form-grid,
+  .actions-row {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .panel > h2,
+  .section-header {
+    padding-top: 18px;
+  }
+
+  .bar-list,
+  .table-wrap,
+  .form-grid {
+    padding-bottom: 18px;
+  }
+
+  .table-wrap {
+    margin-left: -18px;
+    margin-right: -18px;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .mobile-card-list {
+    padding: 16px 18px 18px;
+  }
+
+  .inbox-panel {
+    padding-bottom: 18px;
+  }
+
+  .inbox-card {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
   .form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -846,7 +933,7 @@ thead th {
   .range-toolbar,
   .form-grid-filters,
   .form-grid-inbox {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .filter-action,
@@ -884,14 +971,6 @@ thead th {
 }
 
 @media (max-width: 768px) {
-  .main-shell {
-    padding: 16px;
-  }
-
-  .topbar-head {
-    flex-direction: column;
-  }
-
   .menu-button {
     display: inline-flex;
   }
@@ -905,7 +984,9 @@ thead th {
   .actions-row,
   .inbox-actions,
   .inbox-nav {
+    flex-direction: column;
     flex-wrap: wrap;
+    align-items: stretch;
   }
 
   .topbar-status {
